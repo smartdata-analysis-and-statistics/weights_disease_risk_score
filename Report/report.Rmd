@@ -1,0 +1,93 @@
+---
+title: "Report"
+author: "Thomas Debray"
+date: "7-12-2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+# Set document properties
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+
+source("../R/functions.r")
+
+library(ggplot2)
+
+dat <- load_imputed_data("F:/Projects/Datasets/Weights disease risk score/IDB_control_imputed.rda")
+
+dat_baseline <- dat %>% group_by(USUBJID.x, TRIAL) %>% 
+  filter(AVISITN == 0) %>%
+  summarize(
+    AGE = first(AGE),
+    SEX = first(MaleGender),
+    RACE = first(WhiteRace),
+    WEIGHTBL = first(WEIGHTBL),
+    ONSYRS = first(ONSYRS),
+    DIAGYRS = first(DIAGYRS),
+    RLPS1YR = first(RLPS1YR),
+    RLPS3YR = first(RLPS3YR),
+    BASE = first(BASE),
+    GDLESBL = first(GDLESBL),
+    T1LESBL = first(T1LESBL),
+    T2LESBL = first(T2LESBL)
+)
+
+npat <- nrow(dat_baseline)
+```
+
+## Data sources
+Previously, four RCTs of relapsing-remitting multiple sclerosis (RRMS) were combined in an integrated clinical trial database. This database includes patient-level data from ADVANCE (pegylated interferon beta-1a s.c. registration trial), DEFINE and CONFIRM (dimethyl fumarate registration trials), and AFFIRM (natalizumab registration trial). Details of these trials are provided below:
+
+* The ADVANCE trial contains `r  length(unique(subset(dat, TRIAL == "ADVANCE" & TRTA == "Placebo")$USUBJID.x))` patients who received placebo every 2 weeks for 48 weeks followed by 125 $\mu$g peginterferon beta-1a subcutaneously every 2 or 4 weeks for 48 weeks (https://www.clinicaltrials.gov/ct2/show/NCT00906399) 
+* The DEFINE trial contains `r length(unique(subset(dat, TRIAL == "DEFINE" & TRTA == "Placebo")$USUBJID.x))` patients who received two placebo capsules orally three times daily (https://www.clinicaltrials.gov/ct2/show/NCT00420212)
+* The CONFIRM trial contains `r length(unique(subset(dat, TRIAL == "CONFIRM" & TRTA == "Placebo")$USUBJID.x))` patients who received two placebo capsules orally three times daily (https://www.clinicaltrials.gov/ct2/show/NCT00451451) 
+* The AFFIRM trial contains  `r length(unique(subset(dat, TRIAL == "AFFIRM" & TRTA == "Placebo")$USUBJID.x))` patients who received placebo, intravenous infusion, every 4 weeks, for up to 116 weeks.  (https://www.clinicaltrials.gov/ct2/show/NCT00027300)
+
+We generated a hypothetical observational study by combining the placebo arms from four clinical trials. The primary outcome for each study is the Expanded Disability Status Scale (EDSS) measured 36 weeks after baseline. The EDSS score is a scale that quantifies disability in 0.5 unit increments, and ranges from 0 (no disability) to 10 (death due to MS).
+
+The baseline covariates common to the three trials are as follows:
+
+* AGE
+* SEX - gender (1 = male, 0 = female)
+* RACE - ethnicity, transformed as (1 = white, 0 = non-white)
+* WEIGHTBL - weight (kg)
+* ONSYRS - Time since first multiple sclerosis symptoms (years)
+* DIAGYRS - Time since multiple sclerosis diagnosis (years)
+* RLPS1YR - No. of Relapses within the previous 12 months (discrete)
+* RLPS3YR - No. of Relapses within the previous 3 years (discrete)
+* BASE - Baseline EDSS  (discrete)
+* GDLESBL - Number of gadolinium-enhancing lesions (continuous)
+* T1LESBL - Number of T1 lesions (continuous)
+* T2LESBL - Number of T2 lesions (continuous)
+
+
+```{r, fig.height = 20, fig.width = 10,}
+ggdat <- data.frame(x = c(dat_baseline$AGE, 
+                          dat_baseline$WEIGHTBL, 
+                          dat_baseline$ONSYRS,
+                          dat_baseline$DIAGYRS,
+                          dat_baseline$BASE,
+                          dat_baseline$RLPS1YR,
+                          dat_baseline$RLPS3YR,
+                          dat_baseline$GDLESBL,
+                          dat_baseline$T1LESBL,
+                          dat_baseline$T2LESBL
+                          ),
+                    var = c(rep("Age", npat), 
+                            rep("Weight", npat), 
+                            rep("Time since first symptoms", npat),
+                            rep("Disease duration (years)", npat),
+                            rep("Baseline EDSS", npat),
+                            rep("No. of Relapses (12mo)", npat),
+                            rep("No. of Relapses (36mo)", npat),
+                            rep("Number of Gd+ lesions", npat),
+                            rep("Number of T1 lesions", npat),
+                            rep("Number of T2 lesions",npat)),
+                    Study = rep(dat_baseline$TRIAL, 10))
+ggplot(ggdat, aes(x = x, color = Study)) + geom_density() + 
+  facet_wrap( ~ var, scales = "free", ncol = 2) +
+  xlab("") +
+  theme(legend.position = "bottom")
+```
