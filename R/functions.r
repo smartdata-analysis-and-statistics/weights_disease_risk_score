@@ -39,7 +39,8 @@ load_imputed_data <- function(fname, seed = 944) {
   impvars <- c("STUDYID.x", "USUBJID.x", "SUBJID.x", "TRIAL", "TRTA", "TRTAN", 
                "VISIT", "AVISIT", "AVISITN", "AVAL", 
                "AGE", "MaleGender", "WhiteRace", "BASE", "HEIGHTBL", "WEIGHTBL", "ONSYRS", 
-               "DIAGYRS", "PRDMTGR", "RLPS1YR", "RLPS3YR", "GDLESBL", "T1LESBL", "T2LESBL")
+               "DIAGYRS", "PRDMTGR", "PRMSGR", "RLPS1YR", "RLPS3YR", "GDLESBL", "T1LESBL", "T2LESBL",
+               "NHPTMBL", "PASATABL", "T25FWABL", "EDSSBL", "TRELMOS")
   mice.prep <- mice(dsout[,impvars], maxit = 0)
   
   pM <- mice.prep$predictorMatrix

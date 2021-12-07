@@ -32,10 +32,15 @@ dat_baseline <- dat %>%
     DIAGYRS = first(DIAGYRS),
     RLPS1YR = first(RLPS1YR),
     RLPS3YR = first(RLPS3YR),
-    BASE = first(BASE),
+    EDSSBL = first(EDSSBL),
     GDLESBL = first(GDLESBL),
     T1LESBL = first(T1LESBL),
-    T2LESBL = first(T2LESBL)
+    T2LESBL = first(T2LESBL),
+    PRMSGR = first(PRMSGR),
+    NHPTMBL = first(NHPTMBL),
+    PASATABL = first(PASATABL),
+    T25FWABL = first(T25FWABL),
+    TRELMOS = first(TRELMOS)
 )
 
 npat <- nrow(dat_baseline)
@@ -44,10 +49,10 @@ npat <- nrow(dat_baseline)
 # Original data sources
 Previously, four RCTs of relapsing-remitting multiple sclerosis (RRMS) were combined in an integrated clinical trial database. This database includes patient-level data from ADVANCE (pegylated interferon beta-1a s.c. registration trial), DEFINE and CONFIRM (dimethyl fumarate registration trials), and AFFIRM (natalizumab registration trial). Details of these trials are provided below:
 
-* The ADVANCE trial contains `r  length(unique(subset(dat, TRIAL == "ADVANCE" & TRTA == "Placebo")$USUBJID.x))` patients who received placebo every 2 weeks for 48 weeks followed by 125 $\mu$g peginterferon beta-1a subcutaneously every 2 or 4 weeks for 48 weeks (https://www.clinicaltrials.gov/ct2/show/NCT00906399) 
-* The DEFINE trial contains `r length(unique(subset(dat, TRIAL == "DEFINE" & TRTA == "Placebo")$USUBJID.x))` patients who received two placebo capsules orally three times daily (https://www.clinicaltrials.gov/ct2/show/NCT00420212)
-* The CONFIRM trial contains `r length(unique(subset(dat, TRIAL == "CONFIRM" & TRTA == "Placebo")$USUBJID.x))` patients who received two placebo capsules orally three times daily (https://www.clinicaltrials.gov/ct2/show/NCT00451451) 
-* The AFFIRM trial contains  `r length(unique(subset(dat, TRIAL == "AFFIRM" & TRTA == "Placebo")$USUBJID.x))` patients who received placebo, intravenous infusion, every 4 weeks, for up to 116 weeks.  (https://www.clinicaltrials.gov/ct2/show/NCT00027300)
+* The ADVANCE trial includes `r  length(unique(subset(dat, TRIAL == "ADVANCE" & TRTA == "Placebo")$USUBJID.x))` patients who received placebo every 2 weeks for 48 weeks followed by 125 $\mu$g peginterferon beta-1a subcutaneously every 2 or 4 weeks for 48 weeks (https://www.clinicaltrials.gov/ct2/show/NCT00906399) 
+* The DEFINE trial includes `r length(unique(subset(dat, TRIAL == "DEFINE" & TRTA == "Placebo")$USUBJID.x))` patients who received two placebo capsules orally three times daily (https://www.clinicaltrials.gov/ct2/show/NCT00420212)
+* The CONFIRM trial includes `r length(unique(subset(dat, TRIAL == "CONFIRM" & TRTA == "Placebo")$USUBJID.x))` patients who received two placebo capsules orally three times daily (https://www.clinicaltrials.gov/ct2/show/NCT00451451) 
+* The AFFIRM trial includes  `r length(unique(subset(dat, TRIAL == "AFFIRM" & TRTA == "Placebo")$USUBJID.x))` patients who received placebo, intravenous infusion, every 4 weeks, for up to 116 weeks.  (https://www.clinicaltrials.gov/ct2/show/NCT00027300)
 
 We here consider the  following baseline covariates:
 
@@ -57,12 +62,19 @@ We here consider the  following baseline covariates:
 * WEIGHTBL - weight (kg)
 * ONSYRS - Time since first multiple sclerosis symptoms (years)
 * DIAGYRS - Time since multiple sclerosis diagnosis (years)
-* RLPS1YR - No. of Relapses within the previous 12 months (discrete)
-* RLPS3YR - No. of Relapses within the previous 3 years (discrete)
-* BASE - Baseline EDSS  (discrete)
-* GDLESBL - Number of gadolinium-enhancing lesions (continuous)
-* T1LESBL - Number of T1 lesions (continuous)
-* T2LESBL - Number of T2 lesions (continuous)
+* EDSSBL - Baseline EDSS  (discrete)
+* PRMSGR - Prior MS Treatment Group (1 = yes, 0 = no)
+* NHPTMBL - Baseline 9 Hole Peg Test Average Score
+* PASATABL -	Baseline PASAT 3 
+* T25FWABL - Baseline Timed 25 Foot Walk 
+* Relapses
+  * RLPS1YR - No. of Relapses within the previous 12 months 
+  * RLPS3YR - No. of Relapses within the previous 3 years 
+  * TRELMOS - No. of months Since Recent Pre-Study Relapse
+* MRI findings
+  * GDLESBL - Number of Gd+ lesions 
+  * T1LESBL - Number of T1 weighted lesions 
+  * T2LESBL - Number of T2 weighted lesions 
 
 
 ```{r, fig.height = 20, fig.width = 10}
@@ -70,12 +82,16 @@ ggdat <- data.frame(x = c(dat_baseline$AGE,
                           dat_baseline$WEIGHTBL, 
                           dat_baseline$ONSYRS,
                           dat_baseline$DIAGYRS,
-                          dat_baseline$BASE,
+                          dat_baseline$EDSSBL,
                           dat_baseline$RLPS1YR,
                           dat_baseline$RLPS3YR,
                           dat_baseline$GDLESBL,
                           dat_baseline$T1LESBL,
-                          dat_baseline$T2LESBL
+                          dat_baseline$T2LESBL,
+                          dat_baseline$NHPTMBL,
+                          dat_baseline$PASATABL,
+                          dat_baseline$T25FWABL,
+                          dat_baseline$TRELMOS
                           ),
                     var = c(rep("Age (years)", npat), 
                             rep("Weight (kg)", npat), 
@@ -86,8 +102,13 @@ ggdat <- data.frame(x = c(dat_baseline$AGE,
                             rep("No. of Relapses (36mo)", npat),
                             rep("No. of Gd+ lesions", npat),
                             rep("No. of T1 lesions", npat),
-                            rep("No. of T2 lesions",npat)),
-                    Study = rep(dat_baseline$TRIAL, 10))
+                            rep("No. of T2 lesions",npat),
+                            rep("9 Hole Peg Test Average Score", npat),
+                            rep("PASAT 3", npat), 
+                            rep("Timed 25 Foot Walk", npat),
+                            rep("No. of months Since Recent Pre-Study Relapse",npat)
+                            ),
+                    Study = rep(dat_baseline$TRIAL, 14))
 
 ggplot(ggdat, aes(x = x, color = Study)) + geom_density() + 
   facet_wrap( ~ var, scales = "free", ncol = 2) +
