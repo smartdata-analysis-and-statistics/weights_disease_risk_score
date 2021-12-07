@@ -15,9 +15,13 @@ source("../R/functions.r")
 
 library(ggplot2)
 
+################################################################################
+# Prepare data
+################################################################################
 dat <- load_imputed_data("F:/Projects/Datasets/Weights disease risk score/IDB_control_imputed.rda")
 
-dat_baseline <- dat %>% group_by(USUBJID.x, TRIAL) %>% 
+dat_baseline <- dat %>% 
+  group_by(USUBJID.x, TRIAL) %>% 
   filter(AVISITN == 0) %>%
   summarize(
     AGE = first(AGE),
@@ -45,7 +49,7 @@ Previously, four RCTs of relapsing-remitting multiple sclerosis (RRMS) were comb
 * The CONFIRM trial contains `r length(unique(subset(dat, TRIAL == "CONFIRM" & TRTA == "Placebo")$USUBJID.x))` patients who received two placebo capsules orally three times daily (https://www.clinicaltrials.gov/ct2/show/NCT00451451) 
 * The AFFIRM trial contains  `r length(unique(subset(dat, TRIAL == "AFFIRM" & TRTA == "Placebo")$USUBJID.x))` patients who received placebo, intravenous infusion, every 4 weeks, for up to 116 weeks.  (https://www.clinicaltrials.gov/ct2/show/NCT00027300)
 
-The baseline covariates common to the four trials are as follows:
+We here consider the  following baseline covariates:
 
 * AGE - age (years)
 * SEX - gender (1 = male, 0 = female)
@@ -61,7 +65,7 @@ The baseline covariates common to the four trials are as follows:
 * T2LESBL - Number of T2 lesions (continuous)
 
 
-```{r, fig.height = 20, fig.width = 10,}
+```{r, fig.height = 20, fig.width = 10}
 ggdat <- data.frame(x = c(dat_baseline$AGE, 
                           dat_baseline$WEIGHTBL, 
                           dat_baseline$ONSYRS,
@@ -91,6 +95,16 @@ ggplot(ggdat, aes(x = x, color = Study)) + geom_density() +
   theme(legend.position = "bottom")
 ```
 
+
 # Hypothetical observational study
 We generated a hypothetical observational study by combining the placebo arms from aforementioned four clinical trials. The primary outcome for each study is the Expanded Disability Status Scale (EDSS) measured 36 weeks after baseline. The EDSS score is a scale that quantifies disability in 0.5 unit increments, and ranges from 0 (no disability) to 10 (death due to MS).
+
+```{r}
+# Prepare NRS dataset
+dat_NRS <- prepare_nrs(dat, 
+                       STUDYID_control = c("ADVANCE"), 
+                       STUDYID_treat = c("AFFIRM", "DEFINE", "CONFIRM"), 
+                       SUBGROUP = TRUE)
+```
+
 

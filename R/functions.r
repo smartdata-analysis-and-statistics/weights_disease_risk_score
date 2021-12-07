@@ -3,6 +3,7 @@ library("dplyr")
 library("mice")
 
 load_imputed_data <- function(fname, seed = 944) {
+  dat_cc <- NULL
   
   if (file.exists(fname)) {
     message("Loading previously saved object ",fname)
@@ -51,4 +52,33 @@ load_imputed_data <- function(fname, seed = 944) {
   save(dat_cc, file = fname)
   
   return(dat_cc)
+}
+
+prepare_nrs <- function(data, # List with data sets
+                        STUDYID_control = c("DEFINE", "CONFIRM"),  # Merge DEINFE + CONFIRM
+                        STUDYID_treat = c("AFFIRM"), # AFFIRM
+                        SUBGROUP = FALSE,
+                        END_VISIT = c("WEEK 36", "VISIT 9 WK 36")
+) { 
+  
+  # Set up control group (DEINFE + CONFIRM)
+  ds <- subset(data, TRIAL %in% c(STUDYID_control, STUDYID_treat) & TRTA == "Placebo" & AVISITN == 0)
+  EDSS_END <-  subset(data, TRIAL %in% c(STUDYID_control, STUDYID_treat) & TRTA == "Placebo" & VISIT %in% END_VISIT)[,c("SUBJID.x", "AVAL")]
+  
+  ds_full <- (left_join(ds, EDSS_END, "SUBJID.x"))
+  ds_full <- na.omit(ds_full)
+  
+  ds_full$Trt <- NA
+  ds_full$Trt[which(ds_full$TRIAL %in% STUDYID_control)] <- 0
+  ds_full$Trt[which(ds_full$TRIAL %in% STUDYID_treat)] <- 1
+  
+  ds_full$y <- ds_full$AVAL.y
+  
+  # DO we need to take a subgroup?
+  if (SUBGROUP) {
+    ds_full <- subset(ds_full, (BASE > 2.50 & Trt == 1) | Trt == 0)
+  }
+  
+  
+  ds_full
 }
