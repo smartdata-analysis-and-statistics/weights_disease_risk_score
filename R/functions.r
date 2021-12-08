@@ -2,6 +2,7 @@ library("sas7bdat")
 library("dplyr")
 library("mice")
 library(MatchIt)
+library(countimp)
 
 # target distribution importance weighting
 tdw <- function(a, x, data, estimand="ate",
@@ -141,7 +142,7 @@ simulate_nrs <- function(data, seed = 944) {
   
   # Remove grouping variable
   data <- ungroup(data)
-  data <- select(data, -c(USUBJID.x, TRIAL)) # Remove key columns
+  data <- data %>% dplyr::select(-c(USUBJID.x, TRIAL)) # Remove key columns
   data <- data %>% mutate(imputed = 0)
   
   # Set baseline characteristics of the trial
@@ -167,15 +168,28 @@ simulate_nrs <- function(data, seed = 944) {
   
   pM <- mice.prep$predictorMatrix
   pM[, "imputed"] <- 0
+  
+  imeth <- mice.prep$method
+  imeth["AGE"] <- "pmm"
+  imeth["WEIGHTBL"] <- "rf"
+  imeth["NHPTMBL"] <- "pmm"
+  imeth["T25FWABL"] <- "pmm"
+  imeth["BVZBL"] <- "norm"
+  imeth["ONSYRS"] <- "pmm"
+  imeth["DIAGYRS"] <- "pmm"
+  imeth["RLPS1YR"] <- "pmm" 
+  imeth["RLPS3YR"] <- "pmm" 
 
 
-  fit <- mice(data[,impvars], method = mice.prep$method, predictorMatrix = pM, m = 1, maxit = 10, printFlag = FALSE)
+  
+
+  fit <- mice(data[,impvars], method = imeth, predictorMatrix = pM, m = 1, maxit = 10, printFlag = FALSE)
   
   dat_cc <- complete(fit,1)
   
   # Remove patients with baseline EDSS <= 2.50
   dat_cc <- subset(dat_cc, ((EDSSBL > 2.50 & Trt == 1) | Trt == 0) & imputed == 1)
-  dat_cc <- select(dat_cc, -imputed)
+  dat_cc <- dat_cc %>% dplyr::select(-imputed)
   
   dat_cc$TrtGroup <- ifelse(dat_cc$Trt == 0, "Control", "Active")
 

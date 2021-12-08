@@ -120,7 +120,7 @@ knitr::kable(results)
 sim_NRS <- simulate_nrs(dat_NRS)
 ```
 
-Afterwards, we introduce confounding by generating an artificial dataset with a predefined (truncated) Poisson distribution of baseline EDSS. The remaining covariate data are then generated conditional on the previously observed data distribution by means of multiple imputation.  The new dataset has a total of `r nrow(sim_NRS)` patients, with `r nrow(subset(sim_NRS, Trt == 0))` patients receiving control and `r nrow(subset(sim_NRS, Trt == 1))` patients receiving 'active' placebo. 
+Afterwards, we introduce confounding by generating an artificial dataset with a predefined (truncated) Poisson distribution of baseline EDSS. The remaining covariate data are then generated according to the previously observed data distribution. To this purpose, we use multiple imputation with linear regression (continuous variables) and predictive mean matching (discrete covariates). The new dataset has a total of `r nrow(sim_NRS)` patients, with `r nrow(subset(sim_NRS, Trt == 0))` patients receiving control and `r nrow(subset(sim_NRS, Trt == 1))` patients receiving 'active' placebo. 
 
 ```{r, fig.height = 20, fig.width = 10}
 plot_density(sim_NRS, facet = "TrtGroup")
