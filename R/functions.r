@@ -2,7 +2,6 @@ library("sas7bdat")
 library("dplyr")
 library("mice")
 library(MatchIt)
-library(countimp)
 
 # target distribution importance weighting
 tdw <- function(a, x, data, estimand="ate",
