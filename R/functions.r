@@ -167,6 +167,7 @@ simulate_nrs <- function(data, seed = 944) {
   
   pM <- mice.prep$predictorMatrix
   pM[, "imputed"] <- 0
+  pM["y", "Trt"] <- 0 #treatment does not affect the outcome
   
   imeth <- mice.prep$method
   imeth["AGE"] <- "pmm"
@@ -178,7 +179,7 @@ simulate_nrs <- function(data, seed = 944) {
   imeth["DIAGYRS"] <- "pmm"
   imeth["RLPS1YR"] <- "pmm" 
   imeth["RLPS3YR"] <- "pmm" 
-
+  imeth["TRELMOS"] <- "rf" 
 
   
 
