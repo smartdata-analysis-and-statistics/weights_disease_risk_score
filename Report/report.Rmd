@@ -40,7 +40,11 @@ dat_baseline <- dat %>%
     NHPTMBL = first(NHPTMBL),
     PASATABL = first(PASATABL),
     T25FWABL = first(T25FWABL),
-    TRELMOS = first(TRELMOS)
+    TRELMOS = first(TRELMOS),
+    SFMCSBL = first(SFMCSBL),
+    SFPCSBL = first(SFPCSBL),
+    BVZBL = first(BVZBL),
+    VFT25BL = first(VFT25BL)
 )
 
 npat <- nrow(dat_baseline)
@@ -54,7 +58,7 @@ Previously, four RCTs of relapsing-remitting multiple sclerosis (RRMS) were comb
 * The CONFIRM trial includes `r length(unique(subset(dat, TRIAL == "CONFIRM" & TRTA == "Placebo")$USUBJID.x))` patients who received two placebo capsules orally three times daily (https://www.clinicaltrials.gov/ct2/show/NCT00451451) 
 * The AFFIRM trial includes  `r length(unique(subset(dat, TRIAL == "AFFIRM" & TRTA == "Placebo")$USUBJID.x))` patients who received placebo, intravenous infusion, every 4 weeks, for up to 116 weeks.  (https://www.clinicaltrials.gov/ct2/show/NCT00027300)
 
-We here consider the  following baseline covariates:
+We here consider the following baseline covariates:
 
 * AGE - age (years)
 * SEX - gender (1 = male, 0 = female)
@@ -62,70 +66,77 @@ We here consider the  following baseline covariates:
 * WEIGHTBL - weight (kg)
 * ONSYRS - Time since first multiple sclerosis symptoms (years)
 * DIAGYRS - Time since multiple sclerosis diagnosis (years)
-* EDSSBL - Baseline EDSS  (discrete)
+* EDSSBL - Expanded Disability Status Scale (discrete)
 * PRMSGR - Prior MS Treatment Group (1 = yes, 0 = no)
-* NHPTMBL - Baseline 9 Hole Peg Test Average Score
-* PASATABL -	Baseline PASAT 3 
-* T25FWABL - Baseline Timed 25 Foot Walk 
+* NHPTMBL - 9 Hole Peg Test Average Score
+* SFMCSBL - SF-36 mental component score
+* SFPCSBL - SF-36 physical component score
+* PASATABL -	PASAT 3 
+* T25FWABL -  Timed 25 Foot Walk 
+* VFT25BL -	VFT 2.5%
 * Relapses
   * RLPS1YR - No. of Relapses within the previous 12 months 
   * RLPS3YR - No. of Relapses within the previous 3 years 
   * TRELMOS - No. of months Since Recent Pre-Study Relapse
 * MRI findings
+  * BVZBL -	Brain Volume Z-Score
   * GDLESBL - Number of Gd+ lesions 
   * T1LESBL - Number of T1 weighted lesions 
   * T2LESBL - Number of T2 weighted lesions 
 
+MRI findings were only assessed for some trial participants. Missing values were therefore imputed using multiple imputation by chained equations. One imputed dataset was used for the analyses in the illustrative example.
 
 ```{r, fig.height = 20, fig.width = 10}
-ggdat <- data.frame(x = c(dat_baseline$AGE, 
-                          dat_baseline$WEIGHTBL, 
-                          dat_baseline$ONSYRS,
-                          dat_baseline$DIAGYRS,
-                          dat_baseline$EDSSBL,
-                          dat_baseline$RLPS1YR,
-                          dat_baseline$RLPS3YR,
-                          dat_baseline$GDLESBL,
-                          dat_baseline$T1LESBL,
-                          dat_baseline$T2LESBL,
-                          dat_baseline$NHPTMBL,
-                          dat_baseline$PASATABL,
-                          dat_baseline$T25FWABL,
-                          dat_baseline$TRELMOS
-                          ),
-                    var = c(rep("Age (years)", npat), 
-                            rep("Weight (kg)", npat), 
-                            rep("Time since first symptoms (years)", npat),
-                            rep("Time since diagnosis (years)", npat),
-                            rep("Baseline EDSS", npat),
-                            rep("No. of Relapses (12mo)", npat),
-                            rep("No. of Relapses (36mo)", npat),
-                            rep("No. of Gd+ lesions", npat),
-                            rep("No. of T1 lesions", npat),
-                            rep("No. of T2 lesions",npat),
-                            rep("9 Hole Peg Test Average Score", npat),
-                            rep("PASAT 3", npat), 
-                            rep("Timed 25 Foot Walk", npat),
-                            rep("No. of months Since Recent Pre-Study Relapse",npat)
-                            ),
-                    Study = rep(dat_baseline$TRIAL, 14))
-
-ggplot(ggdat, aes(x = x, color = Study)) + geom_density() + 
-  facet_wrap( ~ var, scales = "free", ncol = 2) +
-  xlab("") +
-  theme(legend.position = "bottom")
+plot_density(dat_baseline)
 ```
 
 
 # Hypothetical observational study
-We generated a hypothetical observational study by combining the placebo arms from aforementioned four clinical trials. The primary outcome for each study is the Expanded Disability Status Scale (EDSS) measured 36 weeks after baseline. The EDSS score is a scale that quantifies disability in 0.5 unit increments, and ranges from 0 (no disability) to 10 (death due to MS).
+To mimic an observational study, we consider the ADVANCE trial as control group and combine the remaining three trials (AFFIRM, DEFINE and CONFIRM) into an active treatment group. The combined treatment groups have the following case-mix:
 
-```{r}
+```{r, fig.height = 20, fig.width = 10}
 # Prepare NRS dataset
 dat_NRS <- prepare_nrs(dat, 
                        STUDYID_control = c("ADVANCE"), 
                        STUDYID_treat = c("AFFIRM", "DEFINE", "CONFIRM"), 
-                       SUBGROUP = TRUE)
+                       SUBGROUP = FALSE)
+
+plot_density(dat_NRS, facet = "TrtGroup")
+```
+The treatment effect estimates in this study are as follows:
+```{r}
+results <- analyze_nrs(dat_NRS)
+
+results <- data.frame("Method" = results$method,
+                      "Reference" = 0,
+                      "Estimate" = format(round(results$est_beta, 2), nsmall = 2),
+                      "SE" = format(round(results$est_se, 2), nsmall = 2),
+                      "95%CI" = paste(format(round(results$est_beta_CIl, 2), nsmall = 2), "; ", format(round(results$est_beta_CIu, 2), nsmall = 2)),
+                      "Time" = format(round(results$est_time, 2), nsmall = 2))
+knitr::kable(results)
 ```
 
+```{r}
+sim_NRS <- simulate_nrs(dat_NRS)
+```
+
+Afterwards, we introduce confounding by generating an artificial dataset with a predefined (truncated) Poisson distribution of baseline EDSS. The remaining covariate data are then generated conditional on the previously observed data distribution by means of multiple imputation.  The new dataset has a total of `r nrow(sim_NRS)` patients, with `r nrow(subset(sim_NRS, Trt == 0))` patients receiving control and `r nrow(subset(sim_NRS, Trt == 1))` patients receiving 'active' placebo. 
+
+```{r, fig.height = 20, fig.width = 10}
+plot_density(sim_NRS, facet = "TrtGroup")
+```
+
+The primary outcome for the hypothetical observational study is the Expanded Disability Status Scale (EDSS) measured 36 weeks after baseline. The EDSS score is a scale that quantifies disability in 0.5 unit increments, and ranges from 0 (no disability) to 10 (death due to MS).
+
+```{r, fig.height = 20, fig.width = 10}
+results <- analyze_nrs(sim_NRS)
+
+results <- data.frame("Method" = results$method,
+                      "Reference" = 0,
+                      "Estimate" = format(round(results$est_beta, 2), nsmall = 2),
+                      "SE" = format(round(results$est_se, 2), nsmall = 2),
+                      "95%CI" = paste(format(round(results$est_beta_CIl, 2), nsmall = 2), "; ", format(round(results$est_beta_CIu, 2), nsmall = 2)),
+                      "Time" = format(round(results$est_time, 2), nsmall = 2))
+knitr::kable(results)
+```
 
