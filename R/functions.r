@@ -448,3 +448,53 @@ plot_distr_ps <- function(data, palette = "Set1")
     scale_color_brewer(palette = palette) + 
     scale_fill_brewer(palette = palette)
 }
+
+plot_balance <- function(data, palette = "Set1") # show results for matching with replacement?
+{
+  
+  nnmatch <- matchit(Trt ~ AGE + 
+                       SEX + 
+                       RACE + 
+                       WEIGHTBL +
+                       ONSYRS +
+                       DIAGYRS + 
+                       PRMSGR + 
+                       RLPS1YR + # No. of Relapses 1 Yr Prior to Study
+                       RLPS3YR +
+                       GDLESBL  +
+                       T1LESBL  +
+                       T2LESBL +
+                       NHPTMBL +
+                       PASATABL +
+                       T25FWABL +
+                       EDSSBL + # Baseline EDSS
+                       TRELMOS  +
+                       SFPCSBL  +
+                       SFMCSBL +
+                       BVZBL  +
+                       VFT25BL, data = data, caliper = 0.025, estimand = "ATT")
+  
+    # Calculate SMD
+    sfit <- summary(nnmatch)
+    
+    # Unmatched data
+    ggdat <- data.frame("SMD" = abs(sfit$sum.all[, "Std. Mean Diff."]),
+                        "covariate" = rownames(sfit$sum.all))
+    ggdat <- ggdat %>% arrange(desc(SMD))
+    ggdat$covariate <- factor(ggdat$covariate, levels = ggdat$covariate, labels = ggdat$covariate)
+    
+    
+    ggplot(data = ggdat,
+           mapping = aes(x = covariate, y = SMD)) +
+      #geom_line() +
+      xlab("") + 
+      ylab("Absolute standardized mean difference") +
+      geom_point() +
+      geom_hline(yintercept = 0.1, color = "black", size = 0.1, lty = 2) +
+      coord_flip() +
+      theme_bw() + 
+      theme(legend.key = element_blank())  + 
+      theme(legend.position = "bottom") + 
+      theme(legend.title = element_blank())
+  
+}

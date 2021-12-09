@@ -103,10 +103,16 @@ dat_NRS <- prepare_nrs(dat,
 plot_density(dat_NRS, facet = "TrtGroup")
 ```
 
-The resulting dataset has a total of `r nrow(dat_NRS)` patients, with `r nrow(subset(dat_NRS, Trt == 0))` patients receiving control and `r nrow(subset(dat_NRS, Trt == 1))` patients receiving 'active' placebo. The figure below indicates that both treatment groups have a similar distribution of propensity scores, which suggests that their respective populations do not differ much.
+The resulting dataset has a total of `r nrow(dat_NRS)` patients, with `r nrow(subset(dat_NRS, Trt == 0))` patients receiving control and `r nrow(subset(dat_NRS, Trt == 1))` patients receiving 'active' placebo. The figure below indicates that both treatment groups have a similar distribution of propensity scores, which suggests that their respective populations somewhat differ from one another.
 
 ```{r, fig.height = 5, fig.width = 10}
 plot_distr_ps(dat_NRS)
+```
+
+There is imbalance for several covariates
+
+```{r, fig.height = 5, fig.width = 10}
+plot_balance(dat_NRS)
 ```
 
 We consider the Expanded Disability Status Scale (EDSS) measured 36 weeks after baseline as the primary outcome. The EDSS score is a scale that quantifies disability in 0.5 unit increments, and ranges from 0 (no disability) to 10 (death due to MS). Subsequently, we estimate the ATT using five approaches:
@@ -142,10 +148,16 @@ We generated an artificial dataset with a predefined distribution of baseline ED
 plot_density(sim_NRS, facet = "TrtGroup")
 ```
 
-In the simulated observational study, patients receiving the 'active' placebo clearly differ from patients receving the 'control' placebo.
+In the simulated observational study, patients receiving the 'active' placebo clearly differ from patients receiving the 'control' placebo.
 
 ```{r, fig.height = 5, fig.width = 10}
 plot_distr_ps(sim_NRS)
+```
+
+There is imbalance for several covariates:
+
+```{r, fig.height = 5, fig.width = 10}
+plot_balance(sim_NRS)
 ```
 
 The treatment effect estimates in this study are as follows:
