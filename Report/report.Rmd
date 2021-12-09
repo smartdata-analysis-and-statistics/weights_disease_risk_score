@@ -91,19 +91,33 @@ plot_density(dat_baseline)
 ```
 
 
-# Hypothetical observational study
-To mimic an observational study, we consider the ADVANCE trial as control group and combine the remaining three trials (AFFIRM, DEFINE and CONFIRM) into an active treatment group. The combined treatment groups have the following case-mix:
+# Pooling of placebo arms
+To mimic an observational study, we consider the ADVANCE trial as 'control' placebo group and combine the remaining three trials (AFFIRM, DEFINE and CONFIRM) into an 'active' placebo group. The resutling treatment groups have the following case-mix distribution:
 
 ```{r, fig.height = 20, fig.width = 10}
 # Prepare NRS dataset
 dat_NRS <- prepare_nrs(dat, 
                        STUDYID_control = c("ADVANCE"), 
-                       STUDYID_treat = c("AFFIRM", "DEFINE", "CONFIRM"), 
-                       SUBGROUP = FALSE)
+                       STUDYID_treat = c("AFFIRM", "DEFINE", "CONFIRM"))
 
 plot_density(dat_NRS, facet = "TrtGroup")
 ```
-The treatment effect estimates in this study are as follows:
+
+The resulting dataset has a total of `r nrow(dat_NRS)` patients, with `r nrow(subset(dat_NRS, Trt == 0))` patients receiving control and `r nrow(subset(dat_NRS, Trt == 1))` patients receiving 'active' placebo. The figure below indicates that both treatment groups have a similar distribution of propensity scores, which suggests that their respective populations do not differ much.
+
+```{r, fig.height = 5, fig.width = 10}
+plot_distr_ps(dat_NRS)
+```
+
+We consider the Expanded Disability Status Scale (EDSS) measured 36 weeks after baseline as the primary outcome. The EDSS score is a scale that quantifies disability in 0.5 unit increments, and ranges from 0 (no disability) to 10 (death due to MS). Subsequently, we estimate the ATT using five approaches:
+
+* Naive: A linear regression ignoring the potential presence of confounding and effect modification.
+* DSR NNM: nearest neighbour matching using the disease risk score
+* DSR OFM: optimal full matching using the disease risk score
+* DSR IPW: inverse probability weighting using the disease risk score
+* DSR TDW: target distribution weighting using the disease risk score
+
+The disease risk score was calculated using linear regression in the control group, and includes the following baseline covariates as main effects:  AGE, SEX, RACE, WEIGHTBL, ONSYRS, DIAGYRS, PRMSGR, RLPS1YR, RLPS3YR, GDLESBL, T1LESBL, T2LESBL, NHPTMBL, PASATABL, T25FWABL, EDSSBL, TRELMOS, SFPCSBL, SFMCSBL, BVZBL and VFT25BL. The treatment effect estimates in this study are as follows:
 ```{r}
 results <- analyze_nrs(dat_NRS)
 
@@ -115,20 +129,28 @@ results <- data.frame("Method" = results$method,
                       "Time" = format(round(results$est_time, 2), nsmall = 2))
 knitr::kable(results)
 ```
+Results suggest that both placebo treatments are equally effective in reducing the EDSS after 36 weeks.
 
+# Simulation of an observational study
 ```{r}
-sim_NRS <- simulate_nrs(dat_NRS)
+sim_NRS <- simulate_nrs(dat_NRS)  #simulate_nrs(dat_NRS, load = FALSE, dir = "Data/")
 ```
 
-Afterwards, we introduce confounding by generating an artificial dataset with a predefined (truncated) Poisson distribution of baseline EDSS. The remaining covariate data are then generated according to the previously observed data distribution. To this purpose, we use multiple imputation with linear regression (continuous variables), random forests (skewed and semi-continuous variables) and predictive mean matching (discrete covariates). Imputation of the primary outcome was not informed by treatment group to ensure the absence of any genuine treatment effect. The new dataset has a total of `r nrow(sim_NRS)` patients, with `r nrow(subset(sim_NRS, Trt == 0))` patients receiving control and `r nrow(subset(sim_NRS, Trt == 1))` patients receiving 'active' placebo. 
+We generated an artificial dataset with a predefined distribution of baseline EDSS for the control and active treatment group. To mimic the presence of confounding, we omitted patients with a baseline EDSS <= 2.5 from the active comparator group. The remaining covariates were then generated using multiple imputation. To ensure the absence of any genuine treatment effect, treatment group was not used to impute patient outcomes. The new dataset has a total of `r nrow(sim_NRS)` patients, with `r nrow(subset(sim_NRS, Trt == 0))` patients receiving control and `r nrow(subset(sim_NRS, Trt == 1))` patients receiving 'active' placebo. 
 
 ```{r, fig.height = 20, fig.width = 10}
 plot_density(sim_NRS, facet = "TrtGroup")
 ```
 
-The primary outcome for the hypothetical observational study is the Expanded Disability Status Scale (EDSS) measured 36 weeks after baseline. The EDSS score is a scale that quantifies disability in 0.5 unit increments, and ranges from 0 (no disability) to 10 (death due to MS).
+In the simulated observational study, patients receiving the 'active' placebo clearly differ from patients receving the 'control' placebo.
 
-```{r, fig.height = 20, fig.width = 10}
+```{r, fig.height = 5, fig.width = 10}
+plot_distr_ps(sim_NRS)
+```
+
+The treatment effect estimates in this study are as follows:
+
+```{r}
 results <- analyze_nrs(sim_NRS)
 
 results <- data.frame("Method" = results$method,
@@ -140,3 +162,18 @@ results <- data.frame("Method" = results$method,
 knitr::kable(results)
 ```
 
+Finally, we apply bootstrapping to improve estimation of standard errors:
+
+```{r}
+results <- analyze_nrs_bs(sim_NRS)
+results <- results %>% group_by(method) %>% summarise(est_beta = mean(est_beta), 
+                                                      est_se = mean(est_se),
+                                                      est_time = sum(est_time))
+
+results <- data.frame("Method" = results$method,
+                      "Reference" = 0,
+                      "Estimate" = format(round(results$est_beta, 2), nsmall = 2),
+                      "SE" = format(round(results$est_se, 2), nsmall = 2),
+                      "Time" = format(round(results$est_time, 2), nsmall = 2))
+knitr::kable(results)
+```

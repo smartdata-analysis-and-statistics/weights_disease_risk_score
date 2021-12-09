@@ -2,27 +2,30 @@ library("sas7bdat")
 library("dplyr")
 library("mice")
 library(MatchIt)
+library(tidyr)
+library(mvtnorm)
+library(splines)
 
 # target distribution importance weighting
-tdw <- function(a, x, data, estimand="ate",
+tdw <- function(a, x, data, estimand = "ate",
                 method = "linear", rule = 1, f = 0, ties = mean)
 {
   d <- density(data[,x])
-  f <- approxfun(d, method=method, rule=rule, f=f, ties=ties)
-  d0 <- density(data[data[,a]==0,x])
-  f0 <- approxfun(d0, method=method, rule=rule, f=f, ties=ties)
-  d1 <- density(data[data[,a]==1,x])
-  f1 <- approxfun(d1, method=method, rule=rule, f=f, ties=ties)
+  f <- approxfun(d, method = method, rule = rule, f = f, ties = ties)
+  d0 <- density(data[data[,a] == 0, x])
+  f0 <- approxfun(d0, method = method, rule = rule, f = f, ties = ties)
+  d1 <- density(data[data[,a] == 1, x])
+  f1 <- approxfun(d1, method = method, rule = rule, f = f, ties = ties)
   
-  if(estimand=="ate") {
-    data[data[,a]==1,"w"] <- f(data[data[,a]==1,x])/f1(data[data[,a]==1,x])
-    data[data[,a]==0,"w"] <- f(data[data[,a]==0,x])/f0(data[data[,a]==0,x])
-  } else if(estimand=="att") {
-    data[data[,a]==1,"w"] <- 1
-    data[data[,a]==0,"w"] <- f1(data[data[,a]==0,x])/f0(data[data[,a]==0,x])
-  } else if(estimand=="atu") {
-    data[data[,a]==1,"w"] <- f0(data[data[,a]==1,x])/f1(data[data[,a]==1,x])
-    data[data[,a]==0,"w"] <- 1
+  if (estimand == "ate") {
+    data[data[,a] == 1, "w"] <- f(data[data[,a] == 1, x])/f1(data[data[,a] == 1, x])
+    data[data[,a] == 0, "w"] <- f(data[data[,a] == 0, x])/f0(data[data[,a] == 0, x])
+  } else if (estimand == "att") {
+    data[data[,a] == 1, "w"] <- 1
+    data[data[,a] == 0, "w"] <- f1(data[data[,a] == 0, x])/f0(data[data[,a] == 0, x])
+  } else if (estimand == "atu") {
+    data[data[,a] == 1, "w"] <- f0(data[data[,a] == 1, x])/f1(data[data[,a] == 1, x])
+    data[data[,a] == 0, "w"] <- 1
   }
   TDW <- data[,"w"]
   return(TDW)
@@ -83,7 +86,6 @@ load_imputed_data <- function(fname, seed = 944) {
 prepare_nrs <- function(data, # List with data sets
                         STUDYID_control = c("DEFINE", "CONFIRM"),  # Merge DEINFE + CONFIRM
                         STUDYID_treat = c("AFFIRM"), # AFFIRM
-                        SUBGROUP = FALSE,
                         END_VISIT = c("WEEK 36", "VISIT 9 WK 36")
 ) { 
   
@@ -126,35 +128,91 @@ prepare_nrs <- function(data, # List with data sets
   ds_full$y <- ds_full$AVAL
   ds_full$TrtGroup <- ifelse(ds_full$Trt == 0, "Control", "Active")
   
-  
-  # DO we need to take a subgroup?
-  if (SUBGROUP) {
-    ds_full <- subset(ds_full, (EDSSBL > 2.50 & Trt == 1) | Trt == 0)
-  }
-  
-  
   ds_full
 }
 
-simulate_nrs <- function(data, seed = 944) {
+simulate_nrs <- function(data, load = TRUE, seed = 944, dir = "../Data/") {
   set.seed(seed)
+  
+  dat_cc <- NULL
+  if (load & file.exists(paste(dir, "simdat.rda", sep = "" ))) {
+    load(paste(dir, "simdat.rda", sep = "" ))
+    return(dat_cc)
+  }
+  
+  # Outcome model
+  data$yinteger <- data$y * 2
+  fit_om <- glm(yinteger ~ 
+                  AGE + 
+                  SEX + 
+                  RACE + 
+                  WEIGHTBL +
+                  ONSYRS +
+                  DIAGYRS + 
+                  PRMSGR + 
+                  RLPS1YR + # No. of Relapses 1 Yr Prior to Study
+                  RLPS3YR +
+                  GDLESBL  +
+                  T1LESBL  +
+                  T2LESBL +
+                  NHPTMBL +
+                  PASATABL +
+                  T25FWABL +
+                  EDSSBL + # Baseline EDSS
+                  TRELMOS  +
+                  SFPCSBL  +
+                  SFMCSBL +
+                  BVZBL  +
+                  VFT25BL , data = data, family = quasipoisson())
   
   # Remove grouping variable
   data <- ungroup(data)
   data <- data %>% dplyr::select(-c(USUBJID.x, TRIAL)) # Remove key columns
   data <- data %>% mutate(imputed = 0)
   
-  # Set baseline characteristics of the trial
-  mean_EDSS_trt0 <- mean(data$EDSSBL)
-    
+  ncontrol <- 500
+  ntreated <- 2000
+  
+  data$logT25FWABL <- log(data$T25FWABL + 1)
+  data$logNHPTMBL <- log(data$NHPTMBL + 1)
+  data$sqrtWEIGHTBL <- sqrt(data$WEIGHTBL)
+  
+  # SIgnificant variables:  GDLESBL, T1LESBL, RLPS3YR 
+  
+  simvars <- c("SFPCSBL", "SFMCSBL", "AGE", "logT25FWABL", "logNHPTMBL", "sqrtWEIGHTBL", "BVZBL")
+  
+  meanControl <- colMeans(subset(data, Trt == 0)[,simvars]) - c(3.5, 2.5, -2.5, 0.25, 0.20, -1, 0.3)
+  vcovControl <- cov(subset(data, Trt == 0)[,simvars])
+  rControl <- data.frame(rmvnorm(ncontrol, mean = meanControl, sigma = vcovControl))
+  
+  meanTreated <- colMeans(subset(data, Trt == 1)[,simvars]) + c(2.5, 3, -2, 0.25, 0.1, 1, 0.3)
+  vcovTreated <- cov(subset(data, Trt == 1)[,simvars])
+  rTreated <- data.frame(rmvnorm(ntreated, mean = meanTreated, sigma = vcovTreated))
+
   # Add empty rows to data
   data <- data %>% add_row(
-    EDSSBL = rpois(500, mean_EDSS_trt0),
-    Trt = rep(0,500),
+    #SFPCSBL = rControl$SFPCSBL,
+    #SFMCSBL = rControl$SFMCSBL,
+    #AGE = rControl$AGE,
+    #T25FWABL = exp(rControl$logT25FWABL) - 1,
+    #NHPTMBL = exp(rControl$logNHPTMBL) - 1,
+    #WEIGHTBL = rControl$sqrtWEIGHTBL**2,
+    #BVZBL = rControl$BVZBL,
+    #PASATABL = rbeta(ncontrol, 5.1, 1.15)*60,
+    #GDLESBL = rbeta(ncontrol, 1.5, 130)*75,
+    Trt = rep(0, ncontrol),
     imputed = 1)
   data <- data %>% add_row(
-    EDSSBL = rpois(2000, mean_EDSS_trt0),
-    Trt = rep(1,2000),
+    #SFPCSBL = rTreated$SFPCSBL,
+    #SFMCSBL = rTreated$SFMCSBL,
+    #AGE  = rTreated$AGE,
+    #T25FWABL = exp(rTreated$logT25FWABL) - 1,
+    #NHPTMBL = exp(rTreated$logNHPTMBL) - 1,
+    #WEIGHTBL = rTreated$sqrtWEIGHTBL**2,
+    #BVZBL = rTreated$BVZBL,
+    #PASATABL = rbeta(ntreated, 4.8, 1.00)*60,
+    #GDLESBL = rbeta(ntreated, 1.8, 250)*200,
+    Trt = rep(1, ntreated),
     imputed = 1
     )
   
@@ -162,7 +220,7 @@ simulate_nrs <- function(data, seed = 944) {
   impvars <- c("AGE", "SEX", "RACE", "WEIGHTBL", "ONSYRS", 
                "DIAGYRS", "PRMSGR", "RLPS1YR", "RLPS3YR", "GDLESBL", "T1LESBL", "T2LESBL",
                "NHPTMBL", "PASATABL", "T25FWABL", "EDSSBL", "TRELMOS", "SFPCSBL", "SFMCSBL", "BVZBL", "VFT25BL",
-               "Trt", "y", "imputed")
+               "Trt", "imputed", "y")
   mice.prep <- mice(data[,impvars], maxit = 0)
   
   pM <- mice.prep$predictorMatrix
@@ -180,23 +238,39 @@ simulate_nrs <- function(data, seed = 944) {
   imeth["RLPS1YR"] <- "pmm" 
   imeth["RLPS3YR"] <- "pmm" 
   imeth["TRELMOS"] <- "rf" 
-
-  
+  imeth["SFMCSBL"] <- "rf"
+  imeth["SFMCSBL"] <- "rf"
 
   fit <- mice(data[,impvars], method = imeth, predictorMatrix = pM, m = 1, maxit = 10, printFlag = FALSE)
   
-  dat_cc <- complete(fit,1)
+  dat_cc <- subset(complete(fit,1), imputed == 1)
   
-  # Remove patients with baseline EDSS <= 2.50
-  dat_cc <- subset(dat_cc, ((EDSSBL > 2.50 & Trt == 1) | Trt == 0) & imputed == 1)
+
+  #lp_y <- stats::predict(fit_om, newdata = dat_cc, type = "response")
+  #dat_cc$y <- (rpois(nrow(dat_cc), lambda = lp_y))/2
+  
+  # Selectively remove patients from the control group
+  lp_include <- -log(dat_cc$T25FWABL + 1) - 0.09 * dat_cc$SFPCSBL - 0.05 * dat_cc$SFMCSBL - 0.7 * dat_cc$GDLESBL - 0.5 * log(dat_cc$T1LESBL + 1) - 0.05 * dat_cc$AGE - 0.8 * dat_cc$EDSSBL - 1 * dat_cc$RLPS3YR  - 1 * dat_cc$SEX
+  
+  p_include <- 1/(1 + exp(-(-mean(lp_include) + lp_include)))
+
+  dat_cc$include <- rbinom(n = nrow(dat_cc), size = 1, prob = p_include)
+  dat_cc$include[dat_cc$Trt == 0] <- 1 # Include all control patients
+  
+  
+  dat_cc <- subset(dat_cc, include == 1)
+
+  
+  # Regenerate outcome y
   dat_cc <- dat_cc %>% dplyr::select(-imputed)
-  
   dat_cc$TrtGroup <- ifelse(dat_cc$Trt == 0, "Control", "Active")
+
+  save(dat_cc, file = paste(dir, "simdat.rda", sep = "" ))
 
   return(dat_cc)
 }
 
-plot_density  <- function(data, facet = "TRIAL") {
+plot_density  <- function(data, facet = "TRIAL", palette = "Set1") {
   
   npat <-  nrow(data)
   
@@ -207,12 +281,12 @@ plot_density  <- function(data, facet = "TRIAL") {
                             data$EDSSBL,
                             data$RLPS1YR,
                             data$RLPS3YR,
-                            log(data$GDLESBL),
+                            log(data$GDLESBL + 1),
                             data$T1LESBL,
                             data$T2LESBL,
-                            log(data$NHPTMBL),
+                            log(data$NHPTMBL + 1),
                             data$PASATABL,
-                            log(data$T25FWABL),
+                            log(data$T25FWABL + 1),
                             data$TRELMOS,
                             data$SFPCSBL,
                             data$SFMCSBL,
@@ -244,7 +318,9 @@ plot_density  <- function(data, facet = "TRIAL") {
     facet_wrap( ~ var, scales = "free", ncol = 2) +
     xlab("") +
     theme(legend.position = "bottom") +
-    ggtitle("Baseline characteristics")
+    ggtitle("Baseline characteristics") +
+    scale_color_brewer(palette = palette) + 
+    scale_fill_brewer(palette = palette)
 }
 
 analyze_nrs <- function(data) {
@@ -300,12 +376,10 @@ analyze_nrs <- function(data) {
                VFT25BL 
              , data = data[data$Trt == 0,])
   
-  data$pgs <- predict(pgs, newdata = data, "response")  
+  data$pgs <- predict(pgs, newdata = data, type = "response")  
   t.pgs <- (proc.time() - start.pgs)[1]
   
-  #data$Treatment <- factor(data$Trt, levels = c(0,1), labels = c("Control", "Comparator"))
-  #g1 <- ggplot(data, aes(x = pgs, group = Treatment, color = Treatment)) + geom_density()
-  
+
   # NNM
   start.nnm <- proc.time()
   nnmatch <- matchit(Trt ~ pgs, data = data, caliper = 0.025, estimand = "ATT")
@@ -363,4 +437,78 @@ analyze_nrs <- function(data) {
   results$est_time[5] <- t.tdw
   
   return(results)
+}
+
+analyze_nrs_bs <- function(data, iter = 1000, seed = 944, load = TRUE, dir = "../Data/") {
+  B.RESULTS <- NULL
+  
+  if (load & file.exists(paste(dir, "bootstrap.rda", sep = ""))) {
+    load(paste(dir, "bootstrap.rda", sep = ""))
+    return(B.RESULTS)
+  }
+  
+  
+  pb <- txtProgressBar(min = 0, max = iter, initial = 0) 
+  for (b in seq(iter))
+  {
+    set.seed(seed + b)
+    
+    data.b <- data[sample(rownames(data), nrow(data), replace = TRUE),]
+    b.results <- analyze_nrs(data.b)
+    
+    B.RESULTS <- rbind(B.RESULTS, data.frame(iter = b, b.results))
+    setTxtProgressBar(pb,b)
+  }
+  close(pb)
+  
+  B.RESULTS$method <- factor(B.RESULTS$method, labels = unique(B.RESULTS$method),
+                             levels = unique(B.RESULTS$method))
+  
+  save(B.RESULTS, file = paste(dir, "bootstrap.rda", sep = ""))
+  
+  return(B.RESULTS)
+}
+
+
+plot_distr_ps <- function(data, palette = "Set1") 
+{
+  # Calculate the PS
+  fit <- glm(Trt ~ AGE + 
+        SEX + 
+        RACE + 
+        WEIGHTBL +
+        ONSYRS +
+        DIAGYRS + 
+        PRMSGR + 
+        RLPS1YR + # No. of Relapses 1 Yr Prior to Study
+        RLPS3YR +
+        GDLESBL  +
+        T1LESBL  +
+        T2LESBL +
+        NHPTMBL +
+        PASATABL +
+        T25FWABL +
+        EDSSBL + # Baseline EDSS
+        TRELMOS  +
+        SFPCSBL  +
+        SFMCSBL +
+        BVZBL  +
+        VFT25BL, data = data, family = binomial())
+  
+  data$pps <- stats::predict(fit, type = "response")
+  
+  data <- data %>%
+    spread(TrtGroup, "pps", sep = "_p")
+  
+  ggplot(data) + 
+    geom_histogram(breaks = seq(0, 1, length = 50), aes(x = TrtGroup_pActive, fill = "Patients treated with active placebo"), color = "red", alpha = 0.5) + 
+    geom_histogram(breaks = seq(0, 1, length = 50), aes(x = TrtGroup_pControl, y = -..count.., fill = "Patients treated with control placebo"), color = "blue", alpha = 0.5) + 
+    ylab("Number of patients") + 
+    xlab("Probability of receiving active placebo") +
+    geom_hline(yintercept = 0, lwd = 0.5) +
+    scale_y_continuous(labels = abs) +
+    theme(legend.position = "bottom", legend.title = element_blank()) +
+    xlim(c(0,1)) +
+    scale_color_brewer(palette = palette) + 
+    scale_fill_brewer(palette = palette)
 }
