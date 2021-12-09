@@ -140,31 +140,6 @@ simulate_nrs <- function(data, load = TRUE, seed = 944, dir = "../Data/") {
     return(dat_cc)
   }
   
-  # Outcome model
-  data$yinteger <- data$y * 2
-  fit_om <- glm(yinteger ~ 
-                  AGE + 
-                  SEX + 
-                  RACE + 
-                  WEIGHTBL +
-                  ONSYRS +
-                  DIAGYRS + 
-                  PRMSGR + 
-                  RLPS1YR + # No. of Relapses 1 Yr Prior to Study
-                  RLPS3YR +
-                  GDLESBL  +
-                  T1LESBL  +
-                  T2LESBL +
-                  NHPTMBL +
-                  PASATABL +
-                  T25FWABL +
-                  EDSSBL + # Baseline EDSS
-                  TRELMOS  +
-                  SFPCSBL  +
-                  SFMCSBL +
-                  BVZBL  +
-                  VFT25BL , data = data, family = quasipoisson())
-  
   # Remove grouping variable
   data <- ungroup(data)
   data <- data %>% dplyr::select(-c(USUBJID.x, TRIAL)) # Remove key columns
@@ -172,46 +147,12 @@ simulate_nrs <- function(data, load = TRUE, seed = 944, dir = "../Data/") {
   
   ncontrol <- 500
   ntreated <- 2000
-  
-  data$logT25FWABL <- log(data$T25FWABL + 1)
-  data$logNHPTMBL <- log(data$NHPTMBL + 1)
-  data$sqrtWEIGHTBL <- sqrt(data$WEIGHTBL)
-  
-  # SIgnificant variables:  GDLESBL, T1LESBL, RLPS3YR 
-  
-  simvars <- c("SFPCSBL", "SFMCSBL", "AGE", "logT25FWABL", "logNHPTMBL", "sqrtWEIGHTBL", "BVZBL")
-  
-  meanControl <- colMeans(subset(data, Trt == 0)[,simvars]) - c(3.5, 2.5, -2.5, 0.25, 0.20, -1, 0.3)
-  vcovControl <- cov(subset(data, Trt == 0)[,simvars])
-  rControl <- data.frame(rmvnorm(ncontrol, mean = meanControl, sigma = vcovControl))
-  
-  meanTreated <- colMeans(subset(data, Trt == 1)[,simvars]) + c(2.5, 3, -2, 0.25, 0.1, 1, 0.3)
-  vcovTreated <- cov(subset(data, Trt == 1)[,simvars])
-  rTreated <- data.frame(rmvnorm(ntreated, mean = meanTreated, sigma = vcovTreated))
 
   # Add empty rows to data
   data <- data %>% add_row(
-    #SFPCSBL = rControl$SFPCSBL,
-    #SFMCSBL = rControl$SFMCSBL,
-    #AGE = rControl$AGE,
-    #T25FWABL = exp(rControl$logT25FWABL) - 1,
-    #NHPTMBL = exp(rControl$logNHPTMBL) - 1,
-    #WEIGHTBL = rControl$sqrtWEIGHTBL**2,
-    #BVZBL = rControl$BVZBL,
-    #PASATABL = rbeta(ncontrol, 5.1, 1.15)*60,
-    #GDLESBL = rbeta(ncontrol, 1.5, 130)*75,
     Trt = rep(0, ncontrol),
     imputed = 1)
   data <- data %>% add_row(
-    #SFPCSBL = rTreated$SFPCSBL,
-    #SFMCSBL = rTreated$SFMCSBL,
-    #AGE  = rTreated$AGE,
-    #T25FWABL = exp(rTreated$logT25FWABL) - 1,
-    #NHPTMBL = exp(rTreated$logNHPTMBL) - 1,
-    #WEIGHTBL = rTreated$sqrtWEIGHTBL**2,
-    #BVZBL = rTreated$BVZBL,
-    #PASATABL = rbeta(ntreated, 4.8, 1.00)*60,
-    #GDLESBL = rbeta(ntreated, 1.8, 250)*200,
     Trt = rep(1, ntreated),
     imputed = 1
     )
@@ -242,12 +183,7 @@ simulate_nrs <- function(data, load = TRUE, seed = 944, dir = "../Data/") {
   imeth["SFMCSBL"] <- "rf"
 
   fit <- mice(data[,impvars], method = imeth, predictorMatrix = pM, m = 1, maxit = 10, printFlag = FALSE)
-  
   dat_cc <- subset(complete(fit,1), imputed == 1)
-  
-
-  #lp_y <- stats::predict(fit_om, newdata = dat_cc, type = "response")
-  #dat_cc$y <- (rpois(nrow(dat_cc), lambda = lp_y))/2
   
   # Selectively remove patients from the control group
   lp_include <- -log(dat_cc$T25FWABL + 1) - 0.09 * dat_cc$SFPCSBL - 0.05 * dat_cc$SFMCSBL - 0.7 * dat_cc$GDLESBL - 0.5 * log(dat_cc$T1LESBL + 1) - 0.05 * dat_cc$AGE - 0.8 * dat_cc$EDSSBL - 1 * dat_cc$RLPS3YR  - 1 * dat_cc$SEX

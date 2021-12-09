@@ -166,14 +166,17 @@ Finally, we apply bootstrapping to improve estimation of standard errors:
 
 ```{r}
 results <- analyze_nrs_bs(sim_NRS)
-results <- results %>% group_by(method) %>% summarise(est_beta = mean(est_beta), 
-                                                      est_se = mean(est_se),
-                                                      est_time = sum(est_time))
+results <- results %>% group_by(method) %>% summarise(beta = mean(est_beta), 
+                                                      beta_se = mean(est_se),
+                                                      beta_CIl = quantile(est_beta, 0.025),
+                                                      beta_CIu = quantile(est_beta, 0.975),
+                                                      time = sum(est_time))
 
 results <- data.frame("Method" = results$method,
                       "Reference" = 0,
-                      "Estimate" = format(round(results$est_beta, 2), nsmall = 2),
-                      "SE" = format(round(results$est_se, 2), nsmall = 2),
-                      "Time" = format(round(results$est_time, 2), nsmall = 2))
+                      "Estimate" = format(round(results$beta, 2), nsmall = 2),
+                      "SE" = format(round(results$beta_se, 2), nsmall = 2),
+                      "95%CI" = paste(format(round(results$beta_CIl, 2), nsmall = 2), "; ", format(round(results$beta_CIu, 2), nsmall = 2)),
+                      "Time" = format(round(results$time, 2), nsmall = 2))
 knitr::kable(results)
 ```
