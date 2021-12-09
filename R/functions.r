@@ -259,6 +259,34 @@ plot_density  <- function(data, facet = "TRIAL", palette = "Set1") {
     scale_fill_brewer(palette = palette)
 }
 
+estimate_pgs <- function(data) {
+  pgs <- glm(y ~ AGE + 
+               SEX + 
+               RACE + 
+               WEIGHTBL +
+               ONSYRS +
+               DIAGYRS + 
+               PRMSGR + 
+               RLPS1YR + # No. of Relapses 1 Yr Prior to Study
+               RLPS3YR +
+               GDLESBL  +
+               T1LESBL  +
+               T2LESBL +
+               NHPTMBL +
+               PASATABL +
+               T25FWABL +
+               EDSSBL + # Baseline EDSS
+               TRELMOS  +
+               SFPCSBL  +
+               SFMCSBL +
+               BVZBL  +
+               VFT25BL 
+             , data = data[data$Trt == 0,])
+  
+  data$pgs <- predict(pgs, newdata = data, type = "response")  
+  return(data)
+}
+
 analyze_nrs <- function(data) {
   
   results <- data.frame(method = c("naive", "DSR NNM", "DSR OFM", "DSR IPW", "DSR TDW" ), 
@@ -445,8 +473,30 @@ plot_distr_ps <- function(data, palette = "Set1")
     scale_y_continuous(labels = abs) +
     theme(legend.position = "bottom", legend.title = element_blank()) +
     xlim(c(0,1)) +
+    ggtitle("Distribution of the propensity score") +
     scale_color_brewer(palette = palette) + 
     scale_fill_brewer(palette = palette)
+}
+
+plot_distr_pgs <- function(data, palette = "Set1") {
+  data <- estimate_pgs(data)
+  
+  data <- data %>%
+    spread(TrtGroup, "pgs", sep = "_p")
+  
+  ggplot(data) + 
+    geom_histogram(breaks = seq(0, 7, 0.5), aes(x = TrtGroup_pActive, fill = "Patients treated with active placebo"), color = "red", alpha = 0.5) + 
+    geom_histogram(breaks = seq(0, 7, 0.5), aes(x = TrtGroup_pControl, y = -..count.., fill = "Patients treated with control placebo"), color = "blue", alpha = 0.5) + 
+    ylab("Number of patients") + 
+    xlab("Predicted EDSS after 36 weeks if treated with control placebo") +
+    geom_hline(yintercept = 0, lwd = 0.5) +
+    scale_y_continuous(labels = abs) +
+    theme(legend.position = "bottom", legend.title = element_blank()) +
+    ggtitle("Distribution of the disease risk score") +
+    scale_color_brewer(palette = palette) + 
+    scale_fill_brewer(palette = palette)
+  
+  
 }
 
 plot_balance <- function(data, palette = "Set1") # show results for matching with replacement?

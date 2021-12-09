@@ -115,6 +115,12 @@ There is imbalance for several covariates
 plot_balance(dat_NRS)
 ```
 
+The distribution of the disease risk score is as follows:
+
+```{r, fig.height = 5, fig.width = 10}
+plot_distr_pgs(dat_NRS)
+```
+
 We consider the Expanded Disability Status Scale (EDSS) measured 36 weeks after baseline as the primary outcome. The EDSS score is a scale that quantifies disability in 0.5 unit increments, and ranges from 0 (no disability) to 10 (death due to MS). Subsequently, we estimate the ATT using five approaches:
 
 * Naive: A linear regression ignoring the potential presence of confounding and effect modification.
@@ -158,6 +164,12 @@ There is imbalance for several covariates:
 
 ```{r, fig.height = 5, fig.width = 10}
 plot_balance(sim_NRS)
+```
+
+The distribution of the disease risk score is as follows:
+
+```{r, fig.height = 5, fig.width = 10}
+plot_distr_pgs(sim_NRS)
 ```
 
 The treatment effect estimates in this study are as follows:
