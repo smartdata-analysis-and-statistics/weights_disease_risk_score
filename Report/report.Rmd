@@ -1,7 +1,7 @@
 ---
 title: "Report"
 author: "Thomas Debray"
-date: "7-12-2021"
+date: "22 sep 2022"
 output: html_document
 ---
 
@@ -13,6 +13,7 @@ knitr::opts_chunk$set(warning = FALSE)
 
 source("../R/functions.r")
 
+library(table1)
 library(ggplot2)
 
 ################################################################################
@@ -92,7 +93,7 @@ plot_density(dat_baseline)
 
 
 # Pooling of placebo arms
-To mimic an observational study, we consider the ADVANCE trial as 'control' placebo group and combine the remaining three trials (AFFIRM, DEFINE and CONFIRM) into an 'active' placebo group. The resutling treatment groups have the following case-mix distribution:
+To mimic an observational study, we consider the ADVANCE trial as 'control' placebo group and combine the remaining three trials (AFFIRM, DEFINE and CONFIRM) into an 'active' placebo group. The resulting treatment groups have the following case-mix distribution:
 
 ```{r, fig.height = 20, fig.width = 10}
 # Prepare NRS dataset
@@ -149,6 +150,47 @@ sim_NRS <- simulate_nrs(dat_NRS)  #simulate_nrs(dat_NRS, load = FALSE, dir = "Da
 ```
 
 We generated an artificial dataset with a predefined distribution of baseline EDSS for the control and active treatment group. To mimic the presence of confounding, we omitted patients with a baseline EDSS <= 2.5 from the active comparator group. The remaining covariates were then generated using multiple imputation. To ensure the absence of any genuine treatment effect, treatment group was not used to impute patient outcomes. The new dataset has a total of `r nrow(sim_NRS)` patients, with `r nrow(subset(sim_NRS, Trt == 0))` patients receiving control and `r nrow(subset(sim_NRS, Trt == 1))` patients receiving 'active' placebo. 
+
+```{r}
+sim_NRS$SEX <- factor(sim_NRS$SEX, levels = c(1,0), labels = c("Male", "Female"))
+sim_NRS$RACE <- factor(sim_NRS$RACE, levels = c(1,0), labels = c("White", "Non-white"))
+sim_NRS$PRMSGR <- factor(sim_NRS$PRMSGR, levels = c(1,0), labels = c("Yes", "No"))
+
+label(sim_NRS$AGE)       <- "Age"
+label(sim_NRS$SEX)       <- "Sex"
+label(sim_NRS$RACE)       <- "Ethnicity"
+label(sim_NRS$WEIGHTBL)       <- "Weight"
+label(sim_NRS$ONSYRS) <- "Time since first multiple sclerosis symptoms"
+label(sim_NRS$DIAGYRS) <- "Time since multiple sclerosis diagnosis"
+label(sim_NRS$EDSSBL) <- "Expanded Disability Status Scale"
+label(sim_NRS$PRMSGR) <- "Prior MS Treatment Group"
+label(sim_NRS$NHPTMBL) <- "9 Hole Peg Test Average Score"
+label(sim_NRS$SFMCSBL) <- "SF-36 mental component score"
+label(sim_NRS$SFPCSBL) <- "SF-36 physical component score"
+label(sim_NRS$PASATABL) <- "PASAT 3"
+label(sim_NRS$T25FWABL) <- "Timed 25 Foot Walk"
+label(sim_NRS$VFT25BL) <- "VFT 2.5%"
+label(sim_NRS$RLPS1YR) <- "No. of Relapses within the previous 12 months"
+label(sim_NRS$RLPS3YR) <- "No. of Relapses within the previous 3 years"
+label(sim_NRS$TRELMOS) <- "No. of months Since Recent Pre-Study Relapse"
+label(sim_NRS$BVZBL) <- "Brain Volume Z-Score"
+label(sim_NRS$GDLESBL) <- "Number of Gd+ lesions"
+label(sim_NRS$T1LESBL) <- "Number of T1 weighted lesions"
+label(sim_NRS$T2LESBL) <- "Number of T2 weighted lesions"
+
+units(sim_NRS$AGE)       <- "years"
+units(sim_NRS$WEIGHTBL) <- "kg"
+units(sim_NRS$ONSYRS)       <- "years"
+units(sim_NRS$DIAGYRS)       <- "years"
+
+
+table1(~ SEX + AGE + RACE + WEIGHTBL + ONSYRS + DIAGYRS + EDSSBL + 
+         NHPTMBL + SFMCSBL + SFPCSBL + PASATABL + T25FWABL + 
+         VFT25BL + RLPS1YR + RLPS3YR + TRELMOS + 
+         BVZBL + GDLESBL + T1LESBL + T2LESBL| TrtGroup, data = sim_NRS)
+```
+
+Density plots for continuous variables are provided below:
 
 ```{r, fig.height = 20, fig.width = 10}
 plot_density(sim_NRS, facet = "TrtGroup")
