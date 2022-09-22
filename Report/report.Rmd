@@ -23,7 +23,7 @@ dat <- load_imputed_data("F:/Projects/Datasets/Weights disease risk score/IDB_co
 
 dat_baseline <- dat %>% 
   group_by(USUBJID.x, TRIAL) %>% 
-  filter(AVISITN == 0) %>%
+  filter(AVISITN == 0 & TRTA == "Placebo") %>%
   summarize(
     AGE = first(AGE),
     SEX = first(MaleGender),
@@ -48,7 +48,6 @@ dat_baseline <- dat %>%
     VFT25BL = first(VFT25BL)
 )
 
-npat <- nrow(dat_baseline)
 ```
 
 # Original data sources
@@ -87,8 +86,45 @@ We here consider the following baseline covariates:
 
 MRI findings were only assessed for some trial participants. Missing values were therefore imputed using multiple imputation by chained equations. One imputed dataset was used for the analyses in the illustrative example.
 
-```{r, fig.height = 20, fig.width = 10}
-plot_density(dat_baseline)
+```{r}
+dat_baseline$SEX <- factor(dat_baseline$SEX, levels = c(1,0), labels = c("Male", "Female"))
+dat_baseline$RACE <- factor(dat_baseline$RACE, levels = c(1,0), labels = c("White", "Non-white"))
+dat_baseline$PRMSGR <- factor(dat_baseline$PRMSGR, levels = c(1,0), labels = c("Yes", "No"))
+
+label(dat_baseline$AGE)       <- "Age"
+label(dat_baseline$SEX)       <- "Sex"
+label(dat_baseline$RACE)       <- "Ethnicity"
+label(dat_baseline$WEIGHTBL)       <- "Weight"
+label(dat_baseline$ONSYRS) <- "Time since first multiple sclerosis symptoms"
+label(dat_baseline$DIAGYRS) <- "Time since multiple sclerosis diagnosis"
+label(dat_baseline$EDSSBL) <- "Expanded Disability Status Scale"
+label(dat_baseline$PRMSGR) <- "Prior MS Treatment Group"
+label(dat_baseline$NHPTMBL) <- "9 Hole Peg Test Average Score"
+label(dat_baseline$SFMCSBL) <- "SF-36 mental component score"
+label(dat_baseline$SFPCSBL) <- "SF-36 physical component score"
+label(dat_baseline$PASATABL) <- "PASAT 3"
+label(dat_baseline$T25FWABL) <- "Timed 25 Foot Walk"
+label(dat_baseline$VFT25BL) <- "VFT 2.5%"
+label(dat_baseline$RLPS1YR) <- "No. of Relapses within the previous 12 months"
+label(dat_baseline$RLPS3YR) <- "No. of Relapses within the previous 3 years"
+label(dat_baseline$TRELMOS) <- "No. of months Since Recent Pre-Study Relapse"
+label(dat_baseline$BVZBL) <- "Brain Volume Z-Score"
+label(dat_baseline$GDLESBL) <- "Number of Gd+ lesions"
+label(dat_baseline$T1LESBL) <- "Number of T1 weighted lesions"
+label(dat_baseline$T2LESBL) <- "Number of T2 weighted lesions"
+
+units(dat_baseline$AGE)       <- "years"
+units(dat_baseline$WEIGHTBL) <- "kg"
+units(dat_baseline$ONSYRS)       <- "years"
+units(dat_baseline$DIAGYRS)       <- "years"
+
+
+table1(~ SEX + AGE + RACE + WEIGHTBL + ONSYRS + DIAGYRS + EDSSBL + 
+         NHPTMBL + SFMCSBL + SFPCSBL + PASATABL + T25FWABL + 
+         VFT25BL + RLPS1YR + RLPS3YR + TRELMOS + 
+         BVZBL + GDLESBL + T1LESBL + T2LESBL| TRIAL, 
+       data = dat_baseline, overall = NULL,
+       caption = "Baseline characteristics of the Placebo patients.")
 ```
 
 
@@ -100,8 +136,6 @@ To mimic an observational study, we consider the ADVANCE trial as 'control' plac
 dat_NRS <- prepare_nrs(dat, 
                        STUDYID_control = c("ADVANCE"), 
                        STUDYID_treat = c("AFFIRM", "DEFINE", "CONFIRM"))
-
-plot_density(dat_NRS, facet = "TrtGroup")
 ```
 
 The resulting dataset has a total of `r nrow(dat_NRS)` patients, with `r nrow(subset(dat_NRS, Trt == 0))` patients receiving control and `r nrow(subset(dat_NRS, Trt == 1))` patients receiving 'active' placebo. The figure below indicates that both treatment groups have a similar distribution of propensity scores, which suggests that their respective populations somewhat differ from one another.
