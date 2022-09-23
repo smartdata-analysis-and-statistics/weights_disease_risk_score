@@ -15,7 +15,10 @@ knitr::opts_chunk$set(warning = FALSE)
 source("../R/functions.r")
 
 library(table1)
+library(dplyr)
 library(ggplot2)
+library(rms)
+library(MatchIt)
 ```
 
 
@@ -23,7 +26,9 @@ library(ggplot2)
 ################################################################################
 # Prepare data
 ################################################################################
-d <- read.csv("F:/OneDrive Smart Data/OneDrive - Smart Data Analysis and Statistics/Research/Manuscripts/Long - PGS weighting/data/RCT_IST.csv")
+
+# Fetch IST v2.0 from the web
+d <- read.csv("https://datashare.ed.ac.uk/bitstream/handle/10283/124/IST%20dataset%20supp1%20%281%29%20trials%202011.csv?sequence=4&isAllowed=y")
 
 dat <- data.frame(HOSPNUM = d$HOSPNUM,
                   OCCODE = d$OCCODE,
@@ -51,7 +56,14 @@ dat <- data.frame(HOSPNUM = d$HOSPNUM,
                   RHEP24 = d$RHEP24,
                   EXPDD = d$EXPDD)
 
-dat_ASP <- subset(dat, RXASP == "Y")
+# Exclude patients
+dat_ASP <- dat %>% filter(RXASP == "Y", # Only include Aspirin patients
+                          OCCODE %in% c(1,2,3,4),  # Exclude patients with missing outcome
+                          RASP3 %in% c("Y", "N"),
+                          RATRIAL %in% c("Y","N"),
+                          RHEP24 %in% c("Y", "N")) %>%
+  mutate(TRT = ifelse(RDELAY <= 8, 1, 0),
+         outcome = ifelse(OCCODE %in% c(1,2), 1, 0))
 ```
 
 The International Stroke Trial was a large, multi-center, randomized, placebo-controlled trial including `r nrow(dat)` stroke patients. The IST evaluated the effect of Aspirin on a primary composite outcome of death or dependency (i.e. absence of autonomy) at 6 months (binary outcome). In this illustrative case study, we focus on `r nrow(dat_ASP)` patients from IST database version 2 that were randomized to receive Aspirin. 
@@ -64,40 +76,168 @@ We excluded patients with
 * No information on the presence of atrial fibrillation (N = `r length(which(!(dat_ASP$RATRIAL %in% c("Y", "N"))))`)
 
 ```{r}
-# Exclude patients
-dat_ASP <- dat_ASP %>% filter(!(OCCODE %in% c(0,9)), 
-                              RASP3 %in% c("Y", "N"),
-                              RATRIAL %in% c("Y","N"),
-                              RHEP24 %in% c("Y", "N"))
-
-
-
-# codage
-dat_ASP$outcome <- ifelse(dat_ASP$OCCODE == 1 | dat_ASP$OCCODE == 2, 1, 0)
-
-
 dat_ASP$ASP <- ifelse(dat_ASP$RXASP == "Y", 1, 0)
 dat_ASP$HEP <- ifelse(dat_ASP$RXHEP == "N", 0, 1)
-dat_ASP$a <- ifelse(dat_ASP$RDELAY <= 8, 1, 0)
 dat_ASP$y <- dat_ASP$outcome
 
 dat_ASP$outcome <- factor(dat_ASP$outcome, 
                           levels = c(1,0), 
                           labels = c("Death or dependency at 6 months", "(not) recovered"))
 
-dat_ASP$albl <- factor(dat_ASP$a, 
-                    levels = c(1,0), 
-                    labels = c("Early Aspirin administration", "Late Aspirin administration"))
 ```
 
-Amongst patients enrolled in the Aspirin arm of the International Stroke Trial, less than a quarter received the treatment between 0 and 8 hours following the onset of symptoms (`r round(nrow(subset(dat_ASP, a == 1))/nrow(dat_ASP)*100,1)`%, N = `r nrow(subset(dat_ASP, a == 1))`). In this group, 1443 (66.8%) patients were recorded with death or dependency at 6 months versus 4248 (60.8%) in the group of patients who received Aspirin later (after 8 hours).
-
+Amongst patients enrolled in the Aspirin arm of the International Stroke Trial, less than a quarter received the treatment between 0 and 8 hours following the onset of symptoms (`r round(nrow(subset(dat_ASP, TRT == 1))/nrow(dat_ASP)*100,1)`%, N = `r nrow(subset(dat_ASP, TRT == 1))`). In this group, `r nrow(subset(dat_ASP, TRT == 1 & y == 1))` (`r round(nrow(subset(dat_ASP, TRT == 1 & y == 1))/nrow(subset(dat_ASP, TRT == 1))*100,1)`%) patients were recorded with death or dependency at 6 months versus `r nrow(subset(dat_ASP, TRT == 0 & y == 1))` (`r round(nrow(subset(dat_ASP, TRT == 0 & y == 1))/nrow(subset(dat_ASP, TRT == 0))*100,1)`%) in the group of patients who received Aspirin later (after 8 hours).
 
 We here consider the following baseline covariates (some of which were imputed):
 
 ```{r}
-table1(~ HOSPNUM + OCCODE + RXASP | albl, 
+dat_ASP$albl <- factor(dat_ASP$TRT, 
+                    levels = c(1,0), 
+                    labels = c("Early Aspirin administration", "Late Aspirin administration"))
+dat_ASP$SEX <- factor(dat_ASP$SEX, 
+                    levels = c("M","F"), 
+                    labels = c("Male", "Female"))
+dat_ASP$RCONSC <- factor(dat_ASP$RCONSC, 
+                    levels = c("F","D", "U"), 
+                    labels = c("Fully alert", "Drowsy", "Unconscious"))
+dat_ASP$RCT <- factor(dat_ASP$RCT, 
+                    levels = c("Y","N"), 
+                    labels = c("Yes", "No"))
+
+label(dat_ASP$AGE)       <- "Age"
+label(dat_ASP$RSBP)       <- "Systolic blood pressure at randomisation"
+label(dat_ASP$SEX)       <- "Gender"
+label(dat_ASP$RCONSC)   <- "Conscious state at randomisation"
+label(dat_ASP$RCT)   <- "CT before randomisation"
+
+
+units(dat_ASP$AGE)       <- "years"
+units(dat_ASP$RSBP)       <- "mmHg"
+
+
+table1(~ AGE + RSBP + SEX + RCONSC + RCT| albl, 
        data = dat_ASP, 
        caption = "Baseline characteristics.")
+
+# relevel(as.factor(RVISINF),ref="N")+
+#relevel(as.factor(STYPE),ref="PACS") +
+#relevel(as.factor(RDEF1),ref="N")
+# relevel(as.factor(RDEF2),ref="N") 
+# relevel(as.factor(RDEF3),ref="N") + relevel(as.factor(RDEF4),ref="N") +
+#relevel(as.factor(RDEF5),ref="N") + relevel(as.factor(RDEF6),ref="N") + relevel(as.factor(RDEF7),ref="N") + relevel(as.factor(RDEF8),ref="N") +
+#as.factor(ATRIAL) +
+#as.factor(ASP3)'
 ```
+
+# Estimation of the treatment effect
+
+We consider the Expanded Disability Status Scale (EDSS) measured 36 weeks after baseline as the primary outcome. Subsequently, we estimate the ATT in the simulated observation study using five approaches:
+
+* Naive: A linear regression ignoring the potential presence of confounding and effect modification.
+* DSR NNM: nearest neighbour matching using the disease risk score
+* DSR OFM: optimal full matching using the disease risk score
+* DSR IPW: inverse probability weighting using the disease risk score
+* DSR TDW: target distribution weighting using the disease risk score
+
+The disease risk score was calculated using linear regression in the control group, and includes the following baseline covariates as main effects: [TODO]
+
+The distribution of the disease risk score is as follows:
+
+```{r, fig.height = 5, fig.width = 10}
+set <- 'rcs(AGE,3) + rcs(RSBP,3) + SEX + RCONSC + RCT + RVISINF + STYPE + RDEF1 + RDEF2 + RDEF3 + RDEF4 + RDEF5 + RDEF6 + RDEF7 + RDEF8 + RATRIAL + RASP3'
+
+fmla.g <- formula(paste("y~", set))
+pgs <- glm(fmla.g, data = dat_ASP[dat_ASP$TRT==0,], family = "binomial")
+dat_ASP$pgs <- predict(pgs, newdata = dat_ASP, "response")
+
+data <- dat_ASP %>%
+    spread(TRT, "pgs", sep = "_p")
+  
+  ggplot(data) + 
+    geom_histogram(aes(x = TRT_p1, fill = "Early Aspirin administration"), color = "red", alpha = 0.5) + 
+    geom_histogram(aes(x = TRT_p0, y = -..count.., fill = "Late Aspirin administration"), color = "blue", alpha = 0.5) + 
+    ylab("Number of patients") + 
+    xlab("Predicted risk of death or dependence at 6 months") +
+    xlim(0,1) + 
+    geom_hline(yintercept = 0, lwd = 0.5) +
+    scale_y_continuous(labels = abs) +
+    theme(legend.position = "bottom", legend.title = element_blank()) +
+    ggtitle("Distribution of the disease risk score") +
+    scale_color_brewer(palette = "Set1") + 
+    scale_fill_brewer(palette = "Set1")
+```
+
+
+# Results
+
+```{r}
+results <- data.frame("Method" = character(),
+                      "Estimate" = numeric(),
+                      "SE" = numeric(),
+                      "CIL" = numeric(),
+                      "CIU" = numeric(),
+                      "Time" = numeric())
+
+##############################################################################
+start.naive <- proc.time()
+naive <- lm(y~TRT,data = dat_ASP)
+t.naive <- (proc.time() - start.naive)[1]
+  
+results <- results %>% add_row(data.frame("Method"  = "naive",
+                                          "Estimate" = coef(naive)["TRT"],
+                                          "SE" = sqrt(diag(vcov(naive)))["TRT"],
+                                          "CIL" = confint(naive)["TRT",]["2.5 %"],
+                                          "CIU" = confint(naive)["TRT",]["97.5 %"],
+                                          "Time" = t.naive))
+##############################################################################
+start.nnm <- proc.time()
+nnmatch <- matchit(TRT ~ pgs, data = dat_ASP, caliper = 0.025)
+dat_ASP$nnm <- nnmatch$weights
+NNM <- glm(y ~ TRT,weights = nnm,data = dat_ASP)
+t.nnm <- (proc.time() - start.nnm)[1]
+
+results <- results %>% add_row(data.frame("Method"  = "DSR NNM",
+                                          "Estimate" = coef(NNM)["TRT"],
+                                          "SE" = sqrt(diag(vcov(NNM)))["TRT"],
+                                          "CIL" = confint(NNM)["TRT",]["2.5 %"],
+                                          "CIU" = confint(NNM)["TRT",]["97.5 %"],
+                                          "Time" = t.nnm))
+############################################################################## 
+start.ofm <- proc.time()
+options("optmatch_max_problem_size" = Inf)
+fullmatch <- matchit(TRT~pgs, data = dat_ASP, method = "full")
+dat_ASP$ofm <- fullmatch$weights
+#OFM <- coef(glm(y~TRT,weights = ofm, data = dat_ASP))["TRT"]
+t.ofm <- (proc.time() - start.ofm)[1]
+  
+############################################################################## 
+start.ipw <- proc.time()
+ps <- glm(TRT~pgs,data = dat_ASP, family = "binomial")
+dat_ASP$ps <- ps$fitted
+dat_ASP$ipw <- dat_ASP$TRT*1 + (1 - dat_ASP$TRT)*(dat_ASP$ps/(1 - dat_ASP$ps))
+IPW <- glm(y~TRT, weights = ipw, data = dat_ASP)
+t.ipw <- (proc.time() - start.ipw)[1]
+
+results <- results %>% add_row(data.frame("Method"  = "DSR IPW",
+                                          "Estimate" = coef(IPW)["TRT"],
+                                          "SE" = sqrt(diag(vcov(IPW)))["TRT"],
+                                          "CIL" = confint(IPW)["TRT",]["2.5 %"],
+                                          "CIU" = confint(IPW)["TRT",]["97.5 %"],
+                                          "Time" = t.ipw))
+##############################################################################  
+# Target distribution weighting
+#start.tdw <- proc.time()
+#data$tdw <- tdw("TRT","pgs",data,estimand="att")
+#TDW <- coef(glm(y~TRT,weights=tdw,data=dat_ASP))["TRT"]
+#t.tdw <- (proc.time() - start.tdw)[1]
+  
+
+  
+
+knitr::kable(results)
+```
+
+
+
+
 
