@@ -95,24 +95,24 @@ dat_ASP$albl <- factor(dat_ASP$TRT,
                     levels = c(1,0), 
                     labels = c("Early Aspirin administration", "Late Aspirin administration"))
 dat_ASP$SEX <- factor(dat_ASP$SEX, 
-                    levels = c("M","F"), 
-                    labels = c("Male", "Female"))
+                    levels = c("F","M"), 
+                    labels = c("Female", "Male"))
 dat_ASP$RCONSC <- factor(dat_ASP$RCONSC, 
                     levels = c("F","D", "U"), 
                     labels = c("Fully alert", "Drowsy", "Unconscious"))
 dat_ASP$RCT <- factor(dat_ASP$RCT, 
-                    levels = c("Y","N"), 
-                    labels = c("Yes", "No"))
+                    levels = c("N","Y"), 
+                    labels = c("No", "Yes"))
 
-label(dat_ASP$AGE)       <- "Age"
-label(dat_ASP$RSBP)       <- "Systolic blood pressure at randomisation"
-label(dat_ASP$SEX)       <- "Gender"
-label(dat_ASP$RCONSC)   <- "Conscious state at randomisation"
-label(dat_ASP$RCT)   <- "CT before randomisation"
+label(dat_ASP$AGE) <- "Age"
+label(dat_ASP$RSBP) <- "Systolic blood pressure at randomisation"
+label(dat_ASP$SEX) <- "Gender"
+label(dat_ASP$RCONSC) <- "Conscious state at randomisation"
+label(dat_ASP$RCT) <- "CT before randomisation"
 
 
-units(dat_ASP$AGE)       <- "years"
-units(dat_ASP$RSBP)       <- "mmHg"
+units(dat_ASP$AGE) <- "years"
+units(dat_ASP$RSBP) <- "mmHg"
 
 
 table1(~ AGE + RSBP + SEX + RCONSC + RCT| albl, 
@@ -125,8 +125,8 @@ table1(~ AGE + RSBP + SEX + RCONSC + RCT| albl,
 # relevel(as.factor(RDEF2),ref="N") 
 # relevel(as.factor(RDEF3),ref="N") + relevel(as.factor(RDEF4),ref="N") +
 #relevel(as.factor(RDEF5),ref="N") + relevel(as.factor(RDEF6),ref="N") + relevel(as.factor(RDEF7),ref="N") + relevel(as.factor(RDEF8),ref="N") +
-#as.factor(ATRIAL) +
-#as.factor(ASP3)'
+#as.factor(RATRIAL) +
+#as.factor(RASP3)'
 ```
 
 # Estimation of the treatment effect
@@ -144,10 +144,11 @@ The disease risk score was calculated using linear regression in the control gro
 The distribution of the disease risk score is as follows:
 
 ```{r, fig.height = 5, fig.width = 10}
-set <- 'rcs(AGE,3) + rcs(RSBP,3) + SEX + RCONSC + RCT + RVISINF + STYPE + RDEF1 + RDEF2 + RDEF3 + RDEF4 + RDEF5 + RDEF6 + RDEF7 + RDEF8 + RATRIAL + RASP3'
+set <- 'rcs(AGE,3) + rcs(RSBP,3) + SEX + RCONSC + RCT + RVISINF + STYPE + 
+RDEF1 + RDEF2 + RDEF3 + RDEF4 + RDEF5 + RDEF6 + RDEF7 + RDEF8 + RATRIAL + RASP3'
 
 fmla.g <- formula(paste("y~", set))
-pgs <- glm(fmla.g, data = dat_ASP[dat_ASP$TRT==0,], family = "binomial")
+pgs <- glm(fmla.g, data = dat_ASP[dat_ASP$TRT == 0,], family = "binomial")
 dat_ASP$pgs <- predict(pgs, newdata = dat_ASP, "response")
 
 data <- dat_ASP %>%
@@ -225,13 +226,17 @@ results <- results %>% add_row(data.frame("Method"  = "DSR IPW",
                                           "CIU" = confint(IPW)["TRT",]["97.5 %"],
                                           "Time" = t.ipw))
 ##############################################################################  
-# Target distribution weighting
-#start.tdw <- proc.time()
-#data$tdw <- tdw("TRT","pgs",data,estimand="att")
-#TDW <- coef(glm(y~TRT,weights=tdw,data=dat_ASP))["TRT"]
-#t.tdw <- (proc.time() - start.tdw)[1]
+start.tdw <- proc.time()
+dat_ASP$tdw <- tdw("TRT","pgs",dat_ASP, estimand = "att")
+TDW <- glm(y~TRT, weights = tdw, data = dat_ASP)
+t.tdw <- (proc.time() - start.tdw)[1]
   
-
+results <- results %>% add_row(data.frame("Method"  = "DSR TDW",
+                                          "Estimate" = coef(TDW)["TRT"],
+                                          "SE" = sqrt(diag(vcov(TDW)))["TRT"],
+                                          "CIL" = confint(TDW)["TRT",]["2.5 %"],
+                                          "CIU" = confint(TDW)["TRT",]["97.5 %"],
+                                          "Time" = t.tdw))
   
 
 knitr::kable(results)
