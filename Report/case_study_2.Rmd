@@ -50,46 +50,54 @@ dat <- data.frame(HOSPNUM = d$HOSPNUM,
                   RASP3 = d$RASP3,
                   RHEP24 = d$RHEP24,
                   EXPDD = d$EXPDD)
+
+dat_ASP <- subset(dat, RXASP == "Y")
 ```
 
-We reanalysed the International Stroke Trial (IST). The IST was a large, multi-center, randomized, placebo-controlled trial including `r nrow(dat)` stroke patients. The IST evaluated the effect of Aspirin on a primary composite outcome of death or dependency (i.e. absence of autonomy) at 6 months (binary outcome). In this illustrative case study, we focus on `r nrow(subset(dat, RXASP == "Y"))` patients that were randomized to receive aspirin.
+The International Stroke Trial was a large, multi-center, randomized, placebo-controlled trial including `r nrow(dat)` stroke patients. The IST evaluated the effect of Aspirin on a primary composite outcome of death or dependency (i.e. absence of autonomy) at 6 months (binary outcome). In this illustrative case study, we focus on `r nrow(dat_ASP)` patients from IST database version 2 that were randomized to receive Aspirin. 
 
+We excluded patients with
+
+* Missing data for the primary outcome (N = `r length(which(dat_ASP$OCCODE == 9 | dat_ASP$OCCODE == 0))`)
+* No information on whether Aspirin was administered within 3 days prior to randomisation  (N = `r length(which(!(dat_ASP$RASP3 %in% c("Y", "N"))))`)
+* No information on whether Heparin was administered within 24 hours prior to randomisation (N = `r length(which(!(dat_ASP$RHEP24 %in% c("Y", "N"))))`)
+* No information on the presence of atrial fibrillation (N = `r length(which(!(dat_ASP$RATRIAL %in% c("Y", "N"))))`)
 
 ```{r}
-##complete case on OCCODE
-dat[dat$OCCODE == 9 | dat$OCCODE == 0,]$OCCODE <- NA
+# Exclude patients
+dat_ASP <- dat_ASP %>% filter(!(OCCODE %in% c(0,9)), 
+                              RASP3 %in% c("Y", "N"),
+                              RATRIAL %in% c("Y","N"),
+                              RHEP24 %in% c("Y", "N"))
+
+
 
 # codage
-dat$outcome <- ifelse(dat$OCCODE == 1 | dat$OCCODE == 2, 1, 0)
-dat$ASP <- ifelse(dat$RXASP == "Y", 1, 0)
-dat$HEP <- ifelse(dat$RXHEP == "N", 0, 1)
-
-# NA
-#984  RASP3
-dat$ASP3 <- ifelse(dat$RASP3 == "Y", 1, ifelse(dat$RASP3 == "N", 0, NA))
-
-# 344 HEP24
-dat$HEP24 <- ifelse(dat$RHEP24 == "Y", 1, ifelse(dat$RHEP24 == "N", 0, NA))
-
-# 984 RATRIAL
-dat$ATRIAL <- ifelse(dat$RATRIAL == "Y", 1, ifelse(dat$RATRIAL == "N", 0, NA))
+dat_ASP$outcome <- ifelse(dat_ASP$OCCODE == 1 | dat_ASP$OCCODE == 2, 1, 0)
 
 
-dat <- dat[dat$ASP == 1,]
-dat <- dat[complete.cases(dat),]
-dat$a <- ifelse(dat$RDELAY <= 8, 1, 0)
-dat$y <- dat$outcome
+dat_ASP$ASP <- ifelse(dat_ASP$RXASP == "Y", 1, 0)
+dat_ASP$HEP <- ifelse(dat_ASP$RXHEP == "N", 0, 1)
+dat_ASP$a <- ifelse(dat_ASP$RDELAY <= 8, 1, 0)
+dat_ASP$y <- dat_ASP$outcome
 
+dat_ASP$outcome <- factor(dat_ASP$outcome, 
+                          levels = c(1,0), 
+                          labels = c("Death or dependency at 6 months", "(not) recovered"))
+
+dat_ASP$albl <- factor(dat_ASP$a, 
+                    levels = c(1,0), 
+                    labels = c("Early Aspirin administration", "Late Aspirin administration"))
 ```
 
-Amongst patients enrolled in the Aspirin arm of the International Stroke Trial, less than a quarter received the treatment between 0 and 8 hours following the onset of symptoms (23.6%, 2 161). In this group, 1443 (66.8%) patients were recorded with death or dependency at 6 months versus 4248 (60.8%) in the group of patients who received Aspirin later (after 8 hours).
+Amongst patients enrolled in the Aspirin arm of the International Stroke Trial, less than a quarter received the treatment between 0 and 8 hours following the onset of symptoms (`r round(nrow(subset(dat_ASP, a == 1))/nrow(dat_ASP)*100,1)`%, N = `r nrow(subset(dat_ASP, a == 1))`). In this group, 1443 (66.8%) patients were recorded with death or dependency at 6 months versus 4248 (60.8%) in the group of patients who received Aspirin later (after 8 hours).
 
 
 We here consider the following baseline covariates (some of which were imputed):
 
 ```{r}
-table1(~ HOSPNUM + OCCODE + RXASP | a, 
-       data = dat, 
+table1(~ HOSPNUM + OCCODE + RXASP | albl, 
+       data = dat_ASP, 
        caption = "Baseline characteristics.")
 ```
 

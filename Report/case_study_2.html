@@ -176,16 +176,23 @@ pre code {
 </div>
 
 
-<p>We reanalysed the International Stroke Trial (IST). The IST was a large, multi-center, randomized, placebo-controlled trial including 19435 stroke patients. The IST evaluated the effect of Aspirin on a primary composite outcome of death or dependency (i.e. absence of autonomy) at 6 months (binary outcome). In this illustrative case study, we focus on 9720 patients that were randomized to receive aspirin.</p>
-<p>Amongst patients enrolled in the Aspirin arm of the International Stroke Trial, less than a quarter received the treatment between 0 and 8 hours following the onset of symptoms (23.6%, 2 161). In this group, 1443 (66.8%) patients were recorded with death or dependency at 6 months versus 4248 (60.8%) in the group of patients who received Aspirin later (after 8 hours).</p>
+<p>The International Stroke Trial was a large, multi-center, randomized, placebo-controlled trial including 19435 stroke patients. The IST evaluated the effect of Aspirin on a primary composite outcome of death or dependency (i.e. absence of autonomy) at 6 months (binary outcome). In this illustrative case study, we focus on 9720 patients from IST database version 2 that were randomized to receive Aspirin.</p>
+<p>We excluded patients with</p>
+<ul>
+<li>Missing data for the primary outcome (N = 81)</li>
+<li>No information on whether Aspirin was administered within 3 days prior to randomisation (N = 493)</li>
+<li>No information on whether Heparin was administered within 24 hours prior to randomisation (N = 172)</li>
+<li>No information on the presence of atrial fibrillation (N = 493)</li>
+</ul>
+<p>Amongst patients enrolled in the Aspirin arm of the International Stroke Trial, less than a quarter received the treatment between 0 and 8 hours following the onset of symptoms (23.6%, N = 2161). In this group, 1443 (66.8%) patients were recorded with death or dependency at 6 months versus 4248 (60.8%) in the group of patients who received Aspirin later (after 8 hours).</p>
 <p>We here consider the following baseline covariates (some of which were imputed):</p>
 <div class="Rtable1"><table class="Rtable1"><caption>Baseline characteristics.</caption>
 
 <thead>
 <tr>
 <th class="rowlabel firstrow lastrow"></th>
-<th class="firstrow lastrow"><span class="stratlabel">0<br><span class="stratn">(N=6987)</span></span></th>
-<th class="firstrow lastrow"><span class="stratlabel">1<br><span class="stratn">(N=2161)</span></span></th>
+<th class="firstrow lastrow"><span class="stratlabel">Early Aspirin administration<br><span class="stratn">(N=2161)</span></span></th>
+<th class="firstrow lastrow"><span class="stratlabel">Late Aspirin administration<br><span class="stratn">(N=6987)</span></span></th>
 <th class="firstrow lastrow"><span class="stratlabel">Overall<br><span class="stratn">(N=9148)</span></span></th>
 </tr>
 </thead>
@@ -198,14 +205,14 @@ pre code {
 </tr>
 <tr>
 <td class="rowlabel">Mean (SD)</td>
-<td>212 (160)</td>
 <td>199 (149)</td>
+<td>212 (160)</td>
 <td>209 (158)</td>
 </tr>
 <tr>
 <td class="rowlabel lastrow">Median [Min, Max]</td>
-<td class="lastrow">186 [1.00, 568]</td>
 <td class="lastrow">153 [1.00, 567]</td>
+<td class="lastrow">186 [1.00, 568]</td>
 <td class="lastrow">180 [1.00, 568]</td>
 </tr>
 <tr>
@@ -216,8 +223,8 @@ pre code {
 </tr>
 <tr>
 <td class="rowlabel">Mean (SD)</td>
-<td>2.38 (0.995)</td>
 <td>2.22 (1.02)</td>
+<td>2.38 (0.995)</td>
 <td>2.34 (1.00)</td>
 </tr>
 <tr>
@@ -234,15 +241,12 @@ pre code {
 </tr>
 <tr>
 <td class="rowlabel lastrow">Y</td>
-<td class="lastrow">6987 (100%)</td>
 <td class="lastrow">2161 (100%)</td>
+<td class="lastrow">6987 (100%)</td>
 <td class="lastrow">9148 (100%)</td>
 </tr>
 </tbody>
 </table>
-</div>
-<div id="number-of-patients-19-435" class="section level1">
-<h1>Number of patients : 19 435</h1>
 </div>
 
 
