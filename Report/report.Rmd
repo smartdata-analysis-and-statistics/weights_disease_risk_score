@@ -1,7 +1,7 @@
 ---
-title: "Report"
+title: "Illustrative case study 1"
 author: "Thomas Debray"
-date: "22 sep 2022"
+date: "This report was generated on `r format(Sys.time(), '%d %B, %Y')`"
 output: html_document
 ---
 
@@ -51,40 +51,14 @@ dat_baseline <- dat %>%
 ```
 
 # Original data sources
-Previously, four RCTs of relapsing-remitting multiple sclerosis (RRMS) were combined in an integrated clinical trial database. This database includes patient-level data from ADVANCE (pegylated interferon beta-1a s.c. registration trial), DEFINE and CONFIRM (dimethyl fumarate registration trials), and AFFIRM (natalizumab registration trial). Details of these trials are provided below:
+Previously, four RCTs of relapsing-remitting multiple sclerosis (RRMS) were combined in an integrated clinical trial database. This database includes patient-level data from the following trials:
 
 * The ADVANCE trial includes `r  length(unique(subset(dat, TRIAL == "ADVANCE" & TRTA == "Placebo")$USUBJID.x))` patients who received placebo every 2 weeks for 48 weeks followed by 125 $\mu$g peginterferon beta-1a subcutaneously every 2 or 4 weeks for 48 weeks (https://www.clinicaltrials.gov/ct2/show/NCT00906399) 
 * The DEFINE trial includes `r length(unique(subset(dat, TRIAL == "DEFINE" & TRTA == "Placebo")$USUBJID.x))` patients who received two placebo capsules orally three times daily (https://www.clinicaltrials.gov/ct2/show/NCT00420212)
 * The CONFIRM trial includes `r length(unique(subset(dat, TRIAL == "CONFIRM" & TRTA == "Placebo")$USUBJID.x))` patients who received two placebo capsules orally three times daily (https://www.clinicaltrials.gov/ct2/show/NCT00451451) 
 * The AFFIRM trial includes  `r length(unique(subset(dat, TRIAL == "AFFIRM" & TRTA == "Placebo")$USUBJID.x))` patients who received placebo, intravenous infusion, every 4 weeks, for up to 116 weeks.  (https://www.clinicaltrials.gov/ct2/show/NCT00027300)
 
-We here consider the following baseline covariates:
-
-* AGE - age (years)
-* SEX - gender (1 = male, 0 = female)
-* RACE - ethnicity, transformed as (1 = white, 0 = non-white)
-* WEIGHTBL - weight (kg)
-* ONSYRS - Time since first multiple sclerosis symptoms (years)
-* DIAGYRS - Time since multiple sclerosis diagnosis (years)
-* EDSSBL - Expanded Disability Status Scale (discrete)
-* PRMSGR - Prior MS Treatment Group (1 = yes, 0 = no)
-* NHPTMBL - 9 Hole Peg Test Average Score
-* SFMCSBL - SF-36 mental component score
-* SFPCSBL - SF-36 physical component score
-* PASATABL -	PASAT 3 
-* T25FWABL -  Timed 25 Foot Walk 
-* VFT25BL -	VFT 2.5%
-* Relapses
-  * RLPS1YR - No. of Relapses within the previous 12 months 
-  * RLPS3YR - No. of Relapses within the previous 3 years 
-  * TRELMOS - No. of months Since Recent Pre-Study Relapse
-* MRI findings
-  * BVZBL -	Brain Volume Z-Score
-  * GDLESBL - Number of Gd+ lesions 
-  * T1LESBL - Number of T1 weighted lesions 
-  * T2LESBL - Number of T2 weighted lesions 
-
-MRI findings were only assessed for some trial participants. Missing values were therefore imputed using multiple imputation by chained equations. One imputed dataset was used for the analyses in the illustrative example.
+We here consider the following baseline covariates (some of which were imputed):
 
 ```{r}
 dat_baseline$SEX <- factor(dat_baseline$SEX, levels = c(1,0), labels = c("Male", "Female"))
@@ -124,12 +98,9 @@ table1(~ SEX + AGE + RACE + WEIGHTBL + ONSYRS + DIAGYRS + EDSSBL +
          VFT25BL + RLPS1YR + RLPS3YR + TRELMOS + 
          BVZBL + GDLESBL + T1LESBL + T2LESBL| TRIAL, 
        data = dat_baseline, overall = NULL,
-       caption = "Baseline characteristics of the Placebo patients.")
+       caption = "Baseline characteristics of the Placebo patients in the original trials.")
 ```
 
-
-# Pooling of placebo arms
-To mimic an observational study, we consider the ADVANCE trial as 'control' placebo group and combine the remaining three trials (AFFIRM, DEFINE and CONFIRM) into an 'active' placebo group. The resulting treatment groups have the following case-mix distribution:
 
 ```{r, fig.height = 20, fig.width = 10}
 # Prepare NRS dataset
@@ -137,53 +108,15 @@ dat_NRS <- prepare_nrs(dat,
                        STUDYID_control = c("ADVANCE"), 
                        STUDYID_treat = c("AFFIRM", "DEFINE", "CONFIRM"))
 ```
+To mimic an observational study, we consider the ADVANCE trial as 'control' placebo group and combine the remaining three trials (AFFIRM, DEFINE and CONFIRM) into an 'active' placebo group. The resulting dataset has a total of `r nrow(dat_NRS)` patients, with `r nrow(subset(dat_NRS, Trt == 0))` patients receiving control and `r nrow(subset(dat_NRS, Trt == 1))` patients receiving 'active' placebo.
 
-The resulting dataset has a total of `r nrow(dat_NRS)` patients, with `r nrow(subset(dat_NRS, Trt == 0))` patients receiving control and `r nrow(subset(dat_NRS, Trt == 1))` patients receiving 'active' placebo. The figure below indicates that both treatment groups have a similar distribution of propensity scores, which suggests that their respective populations somewhat differ from one another.
-
-```{r, fig.height = 5, fig.width = 10}
-plot_distr_ps(dat_NRS)
-```
-
-There is imbalance for several covariates
-
-```{r, fig.height = 5, fig.width = 10}
-plot_balance(dat_NRS)
-```
-
-The distribution of the disease risk score is as follows:
-
-```{r, fig.height = 5, fig.width = 10}
-plot_distr_pgs(dat_NRS)
-```
-
-We consider the Expanded Disability Status Scale (EDSS) measured 36 weeks after baseline as the primary outcome. The EDSS score is a scale that quantifies disability in 0.5 unit increments, and ranges from 0 (no disability) to 10 (death due to MS). Subsequently, we estimate the ATT using five approaches:
-
-* Naive: A linear regression ignoring the potential presence of confounding and effect modification.
-* DSR NNM: nearest neighbour matching using the disease risk score
-* DSR OFM: optimal full matching using the disease risk score
-* DSR IPW: inverse probability weighting using the disease risk score
-* DSR TDW: target distribution weighting using the disease risk score
-
-The disease risk score was calculated using linear regression in the control group, and includes the following baseline covariates as main effects:  AGE, SEX, RACE, WEIGHTBL, ONSYRS, DIAGYRS, PRMSGR, RLPS1YR, RLPS3YR, GDLESBL, T1LESBL, T2LESBL, NHPTMBL, PASATABL, T25FWABL, EDSSBL, TRELMOS, SFPCSBL, SFMCSBL, BVZBL and VFT25BL. The treatment effect estimates in this study are as follows:
-```{r}
-results <- analyze_nrs(dat_NRS)
-
-results <- data.frame("Method" = results$method,
-                      "Reference" = 0,
-                      "Estimate" = format(round(results$est_beta, 2), nsmall = 2),
-                      "SE" = format(round(results$est_se, 2), nsmall = 2),
-                      "95%CI" = paste(format(round(results$est_beta_CIl, 2), nsmall = 2), "; ", format(round(results$est_beta_CIu, 2), nsmall = 2)),
-                      "Time" = format(round(results$est_time, 2), nsmall = 2))
-knitr::kable(results)
-```
-Results suggest that both placebo treatments are equally effective in reducing the EDSS after 36 weeks.
 
 # Simulation of an observational study
 ```{r}
 sim_NRS <- simulate_nrs(dat_NRS)  #simulate_nrs(dat_NRS, load = FALSE, dir = "Data/")
 ```
 
-We generated an artificial dataset with a predefined distribution of baseline EDSS for the control and active treatment group. To mimic the presence of confounding, we omitted patients with a baseline EDSS <= 2.5 from the active comparator group. The remaining covariates were then generated using multiple imputation. To ensure the absence of any genuine treatment effect, treatment group was not used to impute patient outcomes. The new dataset has a total of `r nrow(sim_NRS)` patients, with `r nrow(subset(sim_NRS, Trt == 0))` patients receiving control and `r nrow(subset(sim_NRS, Trt == 1))` patients receiving 'active' placebo. 
+We generated an artificial dataset with a predefined distribution of baseline EDSS for the control and active treatment group. To this purpose, we added 500 patients to the control group and 2000 patients to the active treatment group to the pooled placebo data and imputed their baseline and outcome data using multiple imputation. Subsequently, to mimic the presence of confounding, we omitted patients from the active comparator group according to the following baseline covariates: `T25FWABL` (Timed 25 Foot Walk), `SFPCSBL` (SF-36 physical component score), `SFMCSBL` (SF-36 mental component score), `GDLESBL` (Number of Gd+ lesions), `T1LESBL` (Number of T1 weighted lesions), `AGE` (age), `EDSSBL` (Expanded Disability Status Scale), `RLPS3YR` (No. of Relapses within the previous 3 years) and `SEX`. After imputation, the original trial data were omitted, resulting in a synthetic dataset of `r nrow(sim_NRS)` patients, with `r nrow(subset(sim_NRS, Trt == 0))` patients receiving control and `r nrow(subset(sim_NRS, Trt == 1))` patients receiving 'active' placebo. 
 
 ```{r}
 sim_NRS$SEX <- factor(sim_NRS$SEX, levels = c(1,0), labels = c("Male", "Female"))
@@ -221,13 +154,12 @@ units(sim_NRS$DIAGYRS)       <- "years"
 table1(~ SEX + AGE + RACE + WEIGHTBL + ONSYRS + DIAGYRS + EDSSBL + 
          NHPTMBL + SFMCSBL + SFPCSBL + PASATABL + T25FWABL + 
          VFT25BL + RLPS1YR + RLPS3YR + TRELMOS + 
-         BVZBL + GDLESBL + T1LESBL + T2LESBL| TrtGroup, data = sim_NRS)
+         BVZBL + GDLESBL + T1LESBL + T2LESBL| TrtGroup, data = sim_NRS,
+       caption = "Baseline characteristics of the Placebo patients in the simulated observational study.")
 ```
 
-Density plots for continuous variables are provided below:
-
 ```{r, fig.height = 20, fig.width = 10}
-plot_density(sim_NRS, facet = "TrtGroup")
+#plot_density(sim_NRS, facet = "TrtGroup")
 ```
 
 In the simulated observational study, patients receiving the 'active' placebo clearly differ from patients receiving the 'control' placebo.
@@ -248,7 +180,20 @@ The distribution of the disease risk score is as follows:
 plot_distr_pgs(sim_NRS)
 ```
 
-The treatment effect estimates in this study are as follows:
+# Estimation of the treatment effect
+
+We consider the Expanded Disability Status Scale (EDSS) measured 36 weeks after baseline as the primary outcome. The EDSS score is a scale that quantifies disability in 0.5 unit increments, and ranges from 0 (no disability) to 10 (death due to MS). Subsequently, we estimate the ATT in the simulated observation study using five approaches:
+
+* Naive: A linear regression ignoring the potential presence of confounding and effect modification.
+* DSR NNM: nearest neighbour matching using the disease risk score
+* DSR OFM: optimal full matching using the disease risk score
+* DSR IPW: inverse probability weighting using the disease risk score
+* DSR TDW: target distribution weighting using the disease risk score
+
+The disease risk score was calculated using linear regression in the control group, and includes the following baseline covariates as main effects:  `AGE`, `SEX`, `RACE`, `WEIGHTBL`, `ONSYRS`, `DIAGYRS`, `PRMSGR`, `RLPS1YR`, `RLPS3YR`, `GDLESBL`, `T1LESBL`, `T2LESBL`, `NHPTMBL`, `PASATABL`, `T25FWABL`, `EDSSBL`, `TRELMOS`, `SFPCSBL`, `SFMCSBL`, `BVZBL` and `VFT25BL`. 
+
+# Results
+The treatment effect estimates in this illustrative case study are as follows:
 
 ```{r}
 results <- analyze_nrs(sim_NRS)
