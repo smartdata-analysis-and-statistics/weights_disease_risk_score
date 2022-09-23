@@ -177,6 +177,31 @@ The distribution of the disease risk score is as follows:
 
 ```{r, fig.height = 5, fig.width = 10}
 plot_distr_pgs(sim_NRS)
+
+# Estimate the prognostic score
+pgs <- glm(y ~ AGE + 
+               SEX + 
+               RACE + 
+               WEIGHTBL +
+               ONSYRS +
+               DIAGYRS + 
+               PRMSGR + 
+               RLPS1YR + # No. of Relapses 1 Yr Prior to Study
+               RLPS3YR +
+               GDLESBL  +
+               T1LESBL  +
+               T2LESBL +
+               NHPTMBL +
+               PASATABL +
+               T25FWABL +
+               EDSSBL + # Baseline EDSS
+               TRELMOS  +
+               SFPCSBL  +
+               SFMCSBL +
+               BVZBL  +
+               VFT25BL 
+             , data = sim_NRS[sim_NRS$Trt == 0,])
+sim_NRS$pgs <- predict(pgs, newdata = sim_NRS, type = "response")  
 ```
 
 # Estimation of the treatment effect
@@ -209,7 +234,7 @@ knitr::kable(results)
 Finally, we apply bootstrapping to improve estimation of standard errors:
 
 ```{r}
-results <- analyze_nrs_bs(sim_NRS)
+results <- analyze_nrs_bs(sim_NRS, fn = "bootstrap_cs1.rda")
 results <- results %>% group_by(method) %>% summarise(beta = mean(est_beta), 
                                                       beta_se = mean(est_se),
                                                       beta_CIl = quantile(est_beta, 0.025),

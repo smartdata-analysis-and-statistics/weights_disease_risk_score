@@ -62,7 +62,7 @@ dat_ASP <- dat %>% filter(RXASP == "Y", # Only include Aspirin patients
                           RASP3 %in% c("Y", "N"),
                           RATRIAL %in% c("Y","N"),
                           RHEP24 %in% c("Y", "N")) %>%
-  mutate(TRT = ifelse(RDELAY <= 8, 1, 0),
+  mutate(Trt = ifelse(RDELAY <= 8, 1, 0),
          outcome = ifelse(OCCODE %in% c(1,2), 1, 0))
 ```
 
@@ -86,12 +86,12 @@ dat_ASP$outcome <- factor(dat_ASP$outcome,
 
 ```
 
-Amongst patients enrolled in the Aspirin arm of the International Stroke Trial, less than a quarter received the treatment between 0 and 8 hours following the onset of symptoms (`r round(nrow(subset(dat_ASP, TRT == 1))/nrow(dat_ASP)*100,1)`%, N = `r nrow(subset(dat_ASP, TRT == 1))`). In this group, `r nrow(subset(dat_ASP, TRT == 1 & y == 1))` (`r round(nrow(subset(dat_ASP, TRT == 1 & y == 1))/nrow(subset(dat_ASP, TRT == 1))*100,1)`%) patients were recorded with death or dependency at 6 months versus `r nrow(subset(dat_ASP, TRT == 0 & y == 1))` (`r round(nrow(subset(dat_ASP, TRT == 0 & y == 1))/nrow(subset(dat_ASP, TRT == 0))*100,1)`%) in the group of patients who received Aspirin later (after 8 hours).
+Amongst patients enrolled in the Aspirin arm of the International Stroke Trial, less than a quarter received the treatment between 0 and 8 hours following the onset of symptoms (`r round(nrow(subset(dat_ASP, Trt == 1))/nrow(dat_ASP)*100,1)`%, N = `r nrow(subset(dat_ASP, Trt == 1))`). In this group, `r nrow(subset(dat_ASP, Trt == 1 & y == 1))` (`r round(nrow(subset(dat_ASP, Trt == 1 & y == 1))/nrow(subset(dat_ASP, Trt == 1))*100,1)`%) patients were recorded with death or dependency at 6 months versus `r nrow(subset(dat_ASP, Trt == 0 & y == 1))` (`r round(nrow(subset(dat_ASP, Trt == 0 & y == 1))/nrow(subset(dat_ASP, Trt == 0))*100,1)`%) in the group of patients who received Aspirin later (after 8 hours).
 
 We here consider the following baseline covariates (some of which were imputed):
 
 ```{r}
-dat_ASP$albl <- factor(dat_ASP$TRT, 
+dat_ASP$albl <- factor(dat_ASP$Trt, 
                     levels = c(1,0), 
                     labels = c("Early Aspirin administration", "Late Aspirin administration"))
 dat_ASP$SEX <- factor(dat_ASP$SEX, 
@@ -148,15 +148,15 @@ set <- 'rcs(AGE,3) + rcs(RSBP,3) + SEX + RCONSC + RCT + RVISINF + STYPE +
 RDEF1 + RDEF2 + RDEF3 + RDEF4 + RDEF5 + RDEF6 + RDEF7 + RDEF8 + RATRIAL + RASP3'
 
 fmla.g <- formula(paste("y~", set))
-pgs <- glm(fmla.g, data = dat_ASP[dat_ASP$TRT == 0,], family = "binomial")
+pgs <- glm(fmla.g, data = dat_ASP[dat_ASP$Trt == 0,], family = "binomial")
 dat_ASP$pgs <- predict(pgs, newdata = dat_ASP, "response")
 
 data <- dat_ASP %>%
-    spread(TRT, "pgs", sep = "_p")
+    spread(Trt, "pgs", sep = "_p")
   
   ggplot(data) + 
-    geom_histogram(aes(x = TRT_p1, fill = "Early Aspirin administration"), color = "red", alpha = 0.5) + 
-    geom_histogram(aes(x = TRT_p0, y = -..count.., fill = "Late Aspirin administration"), color = "blue", alpha = 0.5) + 
+    geom_histogram(aes(x = Trt_p1, fill = "Early Aspirin administration"), color = "red", alpha = 0.5) + 
+    geom_histogram(aes(x = Trt_p0, y = -..count.., fill = "Late Aspirin administration"), color = "blue", alpha = 0.5) + 
     ylab("Number of patients") + 
     xlab("Predicted risk of death or dependence at 6 months") +
     xlim(0,1) + 
@@ -172,77 +172,35 @@ data <- dat_ASP %>%
 # Results
 
 ```{r}
-results <- data.frame("Method" = character(),
-                      "Estimate" = numeric(),
-                      "SE" = numeric(),
-                      "CIL" = numeric(),
-                      "CIU" = numeric(),
-                      "Time" = numeric())
+results <- analyze_nrs(dat_ASP)
 
-##############################################################################
-start.naive <- proc.time()
-naive <- lm(y~TRT,data = dat_ASP)
-t.naive <- (proc.time() - start.naive)[1]
-  
-results <- results %>% add_row(data.frame("Method"  = "naive",
-                                          "Estimate" = coef(naive)["TRT"],
-                                          "SE" = sqrt(diag(vcov(naive)))["TRT"],
-                                          "CIL" = confint(naive)["TRT",]["2.5 %"],
-                                          "CIU" = confint(naive)["TRT",]["97.5 %"],
-                                          "Time" = t.naive))
-##############################################################################
-start.nnm <- proc.time()
-nnmatch <- matchit(TRT ~ pgs, data = dat_ASP, caliper = 0.025)
-dat_ASP$nnm <- nnmatch$weights
-NNM <- glm(y ~ TRT,weights = nnm,data = dat_ASP)
-t.nnm <- (proc.time() - start.nnm)[1]
-
-results <- results %>% add_row(data.frame("Method"  = "DSR NNM",
-                                          "Estimate" = coef(NNM)["TRT"],
-                                          "SE" = sqrt(diag(vcov(NNM)))["TRT"],
-                                          "CIL" = confint(NNM)["TRT",]["2.5 %"],
-                                          "CIU" = confint(NNM)["TRT",]["97.5 %"],
-                                          "Time" = t.nnm))
-############################################################################## 
-start.ofm <- proc.time()
-options("optmatch_max_problem_size" = Inf)
-fullmatch <- matchit(TRT~pgs, data = dat_ASP, method = "full")
-dat_ASP$ofm <- fullmatch$weights
-#OFM <- coef(glm(y~TRT,weights = ofm, data = dat_ASP))["TRT"]
-t.ofm <- (proc.time() - start.ofm)[1]
-  
-############################################################################## 
-start.ipw <- proc.time()
-ps <- glm(TRT~pgs,data = dat_ASP, family = "binomial")
-dat_ASP$ps <- ps$fitted
-dat_ASP$ipw <- dat_ASP$TRT*1 + (1 - dat_ASP$TRT)*(dat_ASP$ps/(1 - dat_ASP$ps))
-IPW <- glm(y~TRT, weights = ipw, data = dat_ASP)
-t.ipw <- (proc.time() - start.ipw)[1]
-
-results <- results %>% add_row(data.frame("Method"  = "DSR IPW",
-                                          "Estimate" = coef(IPW)["TRT"],
-                                          "SE" = sqrt(diag(vcov(IPW)))["TRT"],
-                                          "CIL" = confint(IPW)["TRT",]["2.5 %"],
-                                          "CIU" = confint(IPW)["TRT",]["97.5 %"],
-                                          "Time" = t.ipw))
-##############################################################################  
-start.tdw <- proc.time()
-dat_ASP$tdw <- tdw("TRT","pgs",dat_ASP, estimand = "att")
-TDW <- glm(y~TRT, weights = tdw, data = dat_ASP)
-t.tdw <- (proc.time() - start.tdw)[1]
-  
-results <- results %>% add_row(data.frame("Method"  = "DSR TDW",
-                                          "Estimate" = coef(TDW)["TRT"],
-                                          "SE" = sqrt(diag(vcov(TDW)))["TRT"],
-                                          "CIL" = confint(TDW)["TRT",]["2.5 %"],
-                                          "CIU" = confint(TDW)["TRT",]["97.5 %"],
-                                          "Time" = t.tdw))
-  
+results <- data.frame("Method" = results$method,
+                      "Estimate" = format(round(results$est_beta, 2), nsmall = 2),
+                      "SE" = format(round(results$est_se, 2), nsmall = 2),
+                      "95%CI" = paste(format(round(results$est_beta_CIl, 2), nsmall = 2), "; ", format(round(results$est_beta_CIu, 2), nsmall = 2)),
+                      "Time" = format(round(results$est_time, 2), nsmall = 2))
 
 knitr::kable(results)
 ```
 
+Finally, we apply bootstrapping to improve estimation of standard errors:
 
+```{r}
+results <- analyze_nrs_bs(dat_ASP, fn = "bootstrap_cs2.rda")
+results <- results %>% group_by(method) %>% summarise(beta = mean(est_beta), 
+                                                      beta_se = mean(est_se),
+                                                      beta_CIl = quantile(est_beta, 0.025),
+                                                      beta_CIu = quantile(est_beta, 0.975),
+                                                      time = sum(est_time))
+
+results <- data.frame("Method" = results$method,
+                      "Reference" = 0,
+                      "Estimate" = format(round(results$beta, 2), nsmall = 2),
+                      "SE" = format(round(results$beta_se, 2), nsmall = 2),
+                      "95%CI" = paste(format(round(results$beta_CIl, 2), nsmall = 2), "; ", format(round(results$beta_CIu, 2), nsmall = 2)),
+                      "Time" = format(round(results$time, 2), nsmall = 2))
+knitr::kable(results)
+```
 
 
 

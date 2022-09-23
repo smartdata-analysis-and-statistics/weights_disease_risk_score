@@ -288,126 +288,102 @@ estimate_pgs <- function(data) {
 }
 
 analyze_nrs <- function(data) {
+  set.seed(23092022)
+  results <- data.frame("method" = character(),
+                        "est_beta" = numeric(),
+                        "est_se" = numeric(),
+                        "est_beta_CIl" = numeric(),
+                        "est_beta_CIu" = numeric(),
+                        "est_time" = numeric())
   
-  results <- data.frame(method = c("naive", "DSR NNM", "DSR OFM", "DSR IPW", "DSR TDW" ), 
-                        est_beta = NA, 
-                        est_se = NA,
-                        est_beta_CIl = NA, 
-                        est_beta_CIu = NA,
-                        est_time = NA)
-  
-  
-  
-  ####################################################################################################
+  ##############################################################################
   # Naive treatment effect
-  ####################################################################################################
+  ##############################################################################
   start.naive <- proc.time()
-  fit <- glm(y ~ Trt, data = data)
+  naive <- lm(y ~ Trt,data = data)
   t.naive <- (proc.time() - start.naive)[1]
   
-  results$est_beta[1] <- coef(fit)["Trt"]
-  results$est_se[1] <- sqrt(vcov(fit)["Trt", "Trt"])
-  results$est_beta_CIl[1] <- confint(fit)["Trt",]["2.5 %"]
-  results$est_beta_CIu[1] <- confint(fit)["Trt",]["97.5 %"]
-  results$est_time[1] <- t.naive
+  results <- results %>% add_row(
+    data.frame("method"  = "naive",
+               "est_beta" = coef(naive)["Trt"],
+               "est_se" = sqrt(diag(vcov(naive)))["Trt"],
+               "est_beta_CIl" = confint(naive)["Trt",]["2.5 %"],
+               "est_beta_CIu" = confint(naive)["Trt",]["97.5 %"],
+               "est_time" = t.naive))
   
-  ####################################################################################################
-  # Baseline adjusted treatment effect
-  ####################################################################################################
-  
-  ### a) fit a DRS using the unexposed group only
-  start.pgs <- proc.time()
-  pgs <- glm(y ~ AGE + 
-               SEX + 
-               RACE + 
-               WEIGHTBL +
-               ONSYRS +
-               DIAGYRS + 
-               PRMSGR + 
-               RLPS1YR + # No. of Relapses 1 Yr Prior to Study
-               RLPS3YR +
-               GDLESBL  +
-               T1LESBL  +
-               T2LESBL +
-               NHPTMBL +
-               PASATABL +
-               T25FWABL +
-               EDSSBL + # Baseline EDSS
-               TRELMOS  +
-               SFPCSBL  +
-               SFMCSBL +
-               BVZBL  +
-               VFT25BL 
-             , data = data[data$Trt == 0,])
-  
-  data$pgs <- predict(pgs, newdata = data, type = "response")  
-  t.pgs <- (proc.time() - start.pgs)[1]
-  
-
+  ##############################################################################
   # NNM
+  ##############################################################################
   start.nnm <- proc.time()
-  nnmatch <- matchit(Trt ~ pgs, data = data, caliper = 0.025, estimand = "ATT")
+  nnmatch <- matchit(Trt ~ pgs, data = data, caliper = 0.025)
   data$nnm <- nnmatch$weights
-  fit <- glm(y ~ Trt, weights = nnm, data = data)
+  NNM <- glm(y ~ Trt,weights = nnm,data = data)
   t.nnm <- (proc.time() - start.nnm)[1]
   
-  results$est_beta[2] <- fit$coefficient["Trt"]
-  results$est_se[2] <- sqrt(vcov(fit)["Trt", "Trt"])
-  results$est_beta_CIl[2] <- confint(fit)["Trt",]["2.5 %"]
-  results$est_beta_CIu[2] <- confint(fit)["Trt",]["97.5 %"]
-  results$est_time[2] <- t.nnm
+  results <- results %>% add_row(data.frame("method"  = "DSR NNM",
+                                            "est_beta" = coef(NNM)["Trt"],
+                                            "est_se" = sqrt(diag(vcov(NNM)))["Trt"],
+                                            "est_beta_CIl" = confint(NNM)["Trt",]["2.5 %"],
+                                            "est_beta_CIu" = confint(NNM)["Trt",]["97.5 %"],
+                                            "est_time" = t.nnm))
   
-  
-  # Full matching
+  ##############################################################################
+  # OFM
+  ############################################################################## 
   start.ofm <- proc.time()
   options("optmatch_max_problem_size" = Inf)
-  fullmatch <- matchit(Trt ~ pgs, data = data, method = "full", estimand = "ATT")     #if it crashes due to large data set, re-run the above option code and re-run the full matching code
+  fullmatch <- matchit(Trt ~ pgs, data = data, method = "full")
   data$ofm <- fullmatch$weights
-  fit <- glm(y ~ Trt, weights = ofm, data = data)
+  OFM <- glm(y ~ Trt,weights = ofm, data = data)
   t.ofm <- (proc.time() - start.ofm)[1]
-
-  results$est_beta[3] <- fit$coefficient["Trt"]
-  results$est_se[3] <- sqrt(vcov(fit)["Trt", "Trt"])
-  results$est_beta_CIl[3] <- confint(fit)["Trt",]["2.5 %"]
-  results$est_beta_CIu[3] <- confint(fit)["Trt",]["97.5 %"]
-  results$est_time[3] <- t.ofm
   
+  results <- results %>% add_row(data.frame("method"  = "DSR OFM",
+                                            "est_beta" = coef(OFM)["Trt"],
+                                            "est_se" = sqrt(diag(vcov(OFM)))["Trt"],
+                                            "est_beta_CIl" = confint(OFM)["Trt",]["2.5 %"],
+                                            "est_beta_CIu" = confint(OFM)["Trt",]["97.5 %"],
+                                            "est_time" = t.ofm))
   
+  ##############################################################################
   # IPW
+  ############################################################################## 
   start.ipw <- proc.time()
-  ps <- glm(Trt ~ pgs, data = data, family = binomial())         #fit a prognostic propensity score
+  ps <- glm(Trt~pgs,data = data, family = "binomial")
   data$ps <- ps$fitted
   data$ipw <- data$Trt*1 + (1 - data$Trt)*(data$ps/(1 - data$ps))
-  fit <- glm(y ~ Trt, weights = ipw, data = data)
+  IPW <- glm(y~Trt, weights = ipw, data = data)
   t.ipw <- (proc.time() - start.ipw)[1]
-  #g2 <- ggplot(data, aes(x = ps, group = Treatment, color = Treatment)) + geom_density() + xlab("Propensity score")
   
-  results$est_beta[4] <- fit$coefficient["Trt"]
-  results$est_se[4] <- sqrt(vcov(fit)["Trt", "Trt"])
-  results$est_beta_CIl[4] <- confint(fit)["Trt",]["2.5 %"]
-  results$est_beta_CIu[4] <- confint(fit)["Trt",]["97.5 %"]
-  results$est_time[4] <- t.ipw
+  results <- results %>% add_row(data.frame("method"  = "DSR IPW",
+                                            "est_beta" = coef(IPW)["Trt"],
+                                            "est_se" = sqrt(diag(vcov(IPW)))["Trt"],
+                                            "est_beta_CIl" = confint(IPW)["Trt",]["2.5 %"],
+                                            "est_beta_CIu" = confint(IPW)["Trt",]["97.5 %"],
+                                            "est_time" = t.ipw))
   
-  # Target distribution weighting
+  ##############################################################################
+  # TDW
+  ##############################################################################  
   start.tdw <- proc.time()
-  data$tdw <- tdw("Trt", "pgs", as.data.frame(data), estimand = "att")
-  fit <- glm(y ~ Trt, weights = tdw, data = data)
+  data$tdw <- tdw("Trt","pgs", data, estimand = "att")
+  TDW <- glm(y~Trt, weights = tdw, data = data)
   t.tdw <- (proc.time() - start.tdw)[1]
-
-  results$est_beta[5] <- fit$coefficient["Trt"]
-  results$est_se[5] <- sqrt(vcov(fit)["Trt", "Trt"])
-  results$est_beta_CIl[5] <- confint(fit)["Trt",]["2.5 %"]
-  results$est_beta_CIu[5] <- confint(fit)["Trt",]["97.5 %"]
-  results$est_time[5] <- t.tdw
+  
+  results <- results %>% add_row(data.frame("method"  = "DSR TDW",
+                                            "est_beta" = coef(TDW)["Trt"],
+                                            "est_se" = sqrt(diag(vcov(TDW)))["Trt"],
+                                            "est_beta_CIl" = confint(TDW)["Trt",]["2.5 %"],
+                                            "est_beta_CIu" = confint(TDW)["Trt",]["97.5 %"],
+                                            "est_time" = t.tdw))
   
   return(results)
 }
 
-analyze_nrs_bs <- function(data, iter = 1000, seed = 944, load = TRUE, dir = "../Data/") {
+analyze_nrs_bs <- function(data, iter = 1000, seed = 944, load = TRUE, dir = "../Data/", fn = "bootstrap.rda") {
   B.RESULTS <- NULL
   
-  if (load & file.exists(paste(dir, "bootstrap.rda", sep = ""))) {
-    load(paste(dir, "bootstrap.rda", sep = ""))
+  if (load & file.exists(paste0(dir, fn))) {
+    load(paste0(dir, fn))
     return(B.RESULTS)
   }
   
@@ -428,7 +404,7 @@ analyze_nrs_bs <- function(data, iter = 1000, seed = 944, load = TRUE, dir = "..
   B.RESULTS$method <- factor(B.RESULTS$method, labels = unique(B.RESULTS$method),
                              levels = unique(B.RESULTS$method))
   
-  save(B.RESULTS, file = paste(dir, "bootstrap.rda", sep = ""))
+  save(B.RESULTS, file = paste0(dir, fn))
   
   return(B.RESULTS)
 }
