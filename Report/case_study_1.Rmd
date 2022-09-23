@@ -19,7 +19,7 @@ library(ggplot2)
 ################################################################################
 # Prepare data
 ################################################################################
-dat <- load_imputed_data("F:/Projects/Datasets/Weights disease risk score/IDB_control_imputed.rda")
+dat <- load_imputed_data("F:/OneDrive Smart Data/OneDrive - Smart Data Analysis and Statistics/Research/Manuscripts/Long - PGS weighting/data/IDB_control_imputed.rda")
 
 dat_baseline <- dat %>% 
   group_by(USUBJID.x, TRIAL) %>% 
@@ -47,7 +47,6 @@ dat_baseline <- dat %>%
     BVZBL = first(BVZBL),
     VFT25BL = first(VFT25BL)
 )
-
 ```
 
 # Original data sources
