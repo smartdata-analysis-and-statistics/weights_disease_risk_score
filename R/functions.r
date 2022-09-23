@@ -206,7 +206,7 @@ simulate_nrs <- function(data, load = TRUE, seed = 944, dir = "../Data/") {
   return(dat_cc)
 }
 
-plot_density  <- function(data, facet = "TRIAL", palette = "Set1") {
+plot_density <- function(data, facet = "TRIAL", palette = "Set1") {
   
   npat <-  nrow(data)
   

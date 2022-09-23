@@ -66,7 +66,7 @@ dat_ASP <- dat %>% filter(RXASP == "Y", # Only include Aspirin patients
          outcome = ifelse(OCCODE %in% c(1,2), 1, 0))
 ```
 
-The International Stroke Trial was a large, multi-center, randomized, placebo-controlled trial including `r nrow(dat)` stroke patients. The IST evaluated the effect of Aspirin on a primary composite outcome of death or dependency (i.e. absence of autonomy) at 6 months (binary outcome). In this illustrative case study, we focus on `r nrow(dat_ASP)` patients from IST database version 2 that were randomized to receive Aspirin. 
+The International Stroke Trial (IST) was a large, multi-center, randomized, placebo-controlled trial including `r nrow(dat)` stroke patients. The IST evaluated the effect of Aspirin on a primary composite outcome of death or dependency (i.e. absence of autonomy) at 6 months (binary outcome). In this illustrative case study, we focus on `r nrow(dat_ASP)` patients from IST database version 2 that were randomized to receive Aspirin. 
 
 We excluded patients with
 
@@ -101,35 +101,45 @@ dat_ASP$RCONSC <- factor(dat_ASP$RCONSC,
                     levels = c("F","D", "U"), 
                     labels = c("Fully alert", "Drowsy", "Unconscious"))
 dat_ASP$RCT <- factor(dat_ASP$RCT, 
-                    levels = c("N","Y"), 
+                    levels = c("N", "Y"), 
                     labels = c("No", "Yes"))
+dat_ASP$RVISINF <- factor(dat_ASP$RVISINF, 
+                    levels = c("N", "Y"), 
+                    labels = c("No", "Yes"))
+dat_ASP$RVISINF <- factor(dat_ASP$STYPE, 
+                    levels = c("PACS", "TACS", "POCS", "LACS", "Other"), 
+                    labels = c("PACS", "TACS", "POCS", "LACS", "Other"))
 
 label(dat_ASP$AGE) <- "Age"
 label(dat_ASP$RSBP) <- "Systolic blood pressure at randomisation"
 label(dat_ASP$SEX) <- "Gender"
 label(dat_ASP$RCONSC) <- "Conscious state at randomisation"
 label(dat_ASP$RCT) <- "CT before randomisation"
+label(dat_ASP$RVISINF) <- "Infarct visible on CT"
+label(dat_ASP$STYPE) <- "Stroke subtype"
 
 
 units(dat_ASP$AGE) <- "years"
 units(dat_ASP$RSBP) <- "mmHg"
 
 
-table1(~ AGE + RSBP + SEX + RCONSC + RCT| albl, 
+table1(~ AGE + RSBP + SEX + RCONSC + RCT + RVISINF
+       + STYPE| albl, 
        data = dat_ASP, 
-       caption = "Baseline characteristics.")
+       caption = "Baseline characteristics of the patients that were administered Aspirin in the IST.")
 
-# relevel(as.factor(RVISINF),ref="N")+
-#relevel(as.factor(STYPE),ref="PACS") +
-#relevel(as.factor(RDEF1),ref="N")
-# relevel(as.factor(RDEF2),ref="N") 
-# relevel(as.factor(RDEF3),ref="N") + relevel(as.factor(RDEF4),ref="N") +
-#relevel(as.factor(RDEF5),ref="N") + relevel(as.factor(RDEF6),ref="N") + relevel(as.factor(RDEF7),ref="N") + relevel(as.factor(RDEF8),ref="N") +
-#as.factor(RATRIAL) +
-#as.factor(RASP3)'
 ```
 
 # Estimation of the treatment effect
+```{r}
+# We first estimate the prognostic score
+set <- 'rcs(AGE,3) + rcs(RSBP,3) + SEX + RCONSC + RCT + RVISINF + STYPE + 
+RDEF1 + RDEF2 + RDEF3 + RDEF4 + RDEF5 + RDEF6 + RDEF7 + RDEF8 + RATRIAL + RASP3'
+
+fmla.g <- formula(paste("y~", set))
+pgs <- glm(fmla.g, data = dat_ASP[dat_ASP$Trt == 0,], family = "binomial")
+dat_ASP$pgs <- predict(pgs, newdata = dat_ASP, "response")
+```
 
 We consider the Expanded Disability Status Scale (EDSS) measured 36 weeks after baseline as the primary outcome. Subsequently, we estimate the ATT in the simulated observation study using five approaches:
 
@@ -144,13 +154,6 @@ The disease risk score was calculated using linear regression in the control gro
 The distribution of the disease risk score is as follows:
 
 ```{r, fig.height = 5, fig.width = 10}
-set <- 'rcs(AGE,3) + rcs(RSBP,3) + SEX + RCONSC + RCT + RVISINF + STYPE + 
-RDEF1 + RDEF2 + RDEF3 + RDEF4 + RDEF5 + RDEF6 + RDEF7 + RDEF8 + RATRIAL + RASP3'
-
-fmla.g <- formula(paste("y~", set))
-pgs <- glm(fmla.g, data = dat_ASP[dat_ASP$Trt == 0,], family = "binomial")
-dat_ASP$pgs <- predict(pgs, newdata = dat_ASP, "response")
-
 data <- dat_ASP %>%
     spread(Trt, "pgs", sep = "_p")
   
