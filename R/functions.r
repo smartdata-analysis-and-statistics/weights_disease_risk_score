@@ -1,4 +1,4 @@
-library("sas7bdat")
+library(sas7bdat)
 library(dplyr)
 library(mice)
 library(MatchIt)
@@ -166,7 +166,7 @@ simulate_nrs <- function(data, load = TRUE, seed = 944, dir = "../Data/") {
   
   pM <- mice.prep$predictorMatrix
   pM[, "imputed"] <- 0
-  pM["y", "Trt"] <- 0 #treatment does not affect the outcome
+  pM["y", "Trt"] <- 0 # Ensure treatment allocation does not affect the outcome
   
   imeth <- mice.prep$method
   imeth["AGE"] <- "pmm"
@@ -183,7 +183,9 @@ simulate_nrs <- function(data, load = TRUE, seed = 944, dir = "../Data/") {
   imeth["SFMCSBL"] <- "rf"
 
   fit <- mice(data[,impvars], method = imeth, predictorMatrix = pM, m = 1, maxit = 10, printFlag = FALSE)
-  dat_cc <- subset(complete(fit,1), imputed == 1)
+  
+  # Keep only the artificial patients
+  dat_cc <- subset(complete(fit, 1), imputed == 1)
   
   # Selectively remove patients from the control group
   lp_include <- -log(dat_cc$T25FWABL + 1) - 0.09 * dat_cc$SFPCSBL - 0.05 * dat_cc$SFMCSBL - 0.7 * dat_cc$GDLESBL - 0.5 * log(dat_cc$T1LESBL + 1) - 0.05 * dat_cc$AGE - 0.8 * dat_cc$EDSSBL - 1 * dat_cc$RLPS3YR  - 1 * dat_cc$SEX
@@ -260,7 +262,7 @@ plot_density <- function(data, facet = "TRIAL", palette = "Set1") {
 }
 
 estimate_pgs <- function(data) {
-  pgs <- glm(y ~ AGE + 
+  fit <- glm(y ~ AGE + 
                SEX + 
                RACE + 
                WEIGHTBL +
@@ -283,12 +285,11 @@ estimate_pgs <- function(data) {
                VFT25BL 
              , data = data[data$Trt == 0,])
   
-  data$pgs <- predict(pgs, newdata = data, type = "response")  
+  data$pgs <- predict(fit, newdata = data, type = "response")  
   return(data)
 }
 
 analyze_nrs <- function(data) {
-  set.seed(23092022)
   results <- data.frame("method" = character(),
                         "est_beta" = numeric(),
                         "est_se" = numeric(),
@@ -300,16 +301,18 @@ analyze_nrs <- function(data) {
   # Naive treatment effect
   ##############################################################################
   start.naive <- proc.time()
-  naive <- lm(y ~ Trt,data = data)
+  fit <- lm(y ~ Trt,data = data)
+  fitci <- tidy(fit, conf.int = TRUE)
   t.naive <- (proc.time() - start.naive)[1]
   
   results <- results %>% add_row(
     data.frame("method"  = "naive",
-               "est_beta" = coef(naive)["Trt"],
-               "est_se" = sqrt(diag(vcov(naive)))["Trt"],
-               "est_beta_CIl" = confint(naive)["Trt",]["2.5 %"],
-               "est_beta_CIu" = confint(naive)["Trt",]["97.5 %"],
+               "est_beta" = (fitci %>% filter(term == "Trt"))$estimate,
+               "est_se" = (fitci %>% filter(term == "Trt"))$std.error,
+               "est_beta_CIl" = (fitci %>% filter(term == "Trt"))$conf.low,
+               "est_beta_CIu" = (fitci %>% filter(term == "Trt"))$conf.high,
                "est_time" = t.naive))
+  rm(fit, fitci)
   
   ##############################################################################
   # NNM
@@ -317,15 +320,17 @@ analyze_nrs <- function(data) {
   start.nnm <- proc.time()
   nnmatch <- matchit(Trt ~ pgs, data = data, caliper = 0.025)
   data$nnm <- nnmatch$weights
-  NNM <- glm(y ~ Trt,weights = nnm,data = data)
+  fit <- glm(y ~ Trt,weights = nnm,data = data)
+  fitci <- tidy(fit, conf.int = TRUE)
   t.nnm <- (proc.time() - start.nnm)[1]
   
   results <- results %>% add_row(data.frame("method"  = "DSR NNM",
-                                            "est_beta" = coef(NNM)["Trt"],
-                                            "est_se" = sqrt(diag(vcov(NNM)))["Trt"],
-                                            "est_beta_CIl" = confint(NNM)["Trt",]["2.5 %"],
-                                            "est_beta_CIu" = confint(NNM)["Trt",]["97.5 %"],
+                                            "est_beta" = (fitci %>% filter(term == "Trt"))$estimate,
+                                            "est_se" = (fitci %>% filter(term == "Trt"))$std.error,
+                                            "est_beta_CIl" = (fitci %>% filter(term == "Trt"))$conf.low,
+                                            "est_beta_CIu" = (fitci %>% filter(term == "Trt"))$conf.high,
                                             "est_time" = t.nnm))
+  rm(fit, fitci)
   
   ##############################################################################
   # OFM
@@ -334,15 +339,17 @@ analyze_nrs <- function(data) {
   options("optmatch_max_problem_size" = Inf)
   fullmatch <- matchit(Trt ~ pgs, data = data, method = "full")
   data$ofm <- fullmatch$weights
-  OFM <- glm(y ~ Trt,weights = ofm, data = data)
+  fit <- glm(y ~ Trt,weights = ofm, data = data)
+  fitci <- tidy(fit, conf.int = TRUE)
   t.ofm <- (proc.time() - start.ofm)[1]
   
   results <- results %>% add_row(data.frame("method"  = "DSR OFM",
-                                            "est_beta" = coef(OFM)["Trt"],
-                                            "est_se" = sqrt(diag(vcov(OFM)))["Trt"],
-                                            "est_beta_CIl" = confint(OFM)["Trt",]["2.5 %"],
-                                            "est_beta_CIu" = confint(OFM)["Trt",]["97.5 %"],
+                                            "est_beta" = (fitci %>% filter(term == "Trt"))$estimate,
+                                            "est_se" = (fitci %>% filter(term == "Trt"))$std.error,
+                                            "est_beta_CIl" = (fitci %>% filter(term == "Trt"))$conf.low,
+                                            "est_beta_CIu" = (fitci %>% filter(term == "Trt"))$conf.high,
                                             "est_time" = t.ofm))
+  rm(fit, fitci)
   
   ##############################################################################
   # IPW
@@ -351,29 +358,32 @@ analyze_nrs <- function(data) {
   ps <- glm(Trt~pgs,data = data, family = "binomial")
   data$ps <- ps$fitted
   data$ipw <- data$Trt*1 + (1 - data$Trt)*(data$ps/(1 - data$ps))
-  IPW <- glm(y~Trt, weights = ipw, data = data)
+  fit <- glm(y ~ Trt, weights = ipw, data = data)
+  fitci <- tidy(fit, conf.int = TRUE)
   t.ipw <- (proc.time() - start.ipw)[1]
   
   results <- results %>% add_row(data.frame("method"  = "DSR IPW",
-                                            "est_beta" = coef(IPW)["Trt"],
-                                            "est_se" = sqrt(diag(vcov(IPW)))["Trt"],
-                                            "est_beta_CIl" = confint(IPW)["Trt",]["2.5 %"],
-                                            "est_beta_CIu" = confint(IPW)["Trt",]["97.5 %"],
+                                            "est_beta" = (fitci %>% filter(term == "Trt"))$estimate,
+                                            "est_se" = (fitci %>% filter(term == "Trt"))$std.error,
+                                            "est_beta_CIl" = (fitci %>% filter(term == "Trt"))$conf.low,
+                                            "est_beta_CIu" = (fitci %>% filter(term == "Trt"))$conf.high,
                                             "est_time" = t.ipw))
+  rm(fit, fitci)
   
   ##############################################################################
   # TDW
   ##############################################################################  
   start.tdw <- proc.time()
   data$tdw <- tdw("Trt","pgs", data, estimand = "att")
-  TDW <- glm(y~Trt, weights = tdw, data = data)
+  fit <- glm(y ~ Trt, weights = tdw, data = data)
+  fitci <- tidy(fit, conf.int = TRUE)
   t.tdw <- (proc.time() - start.tdw)[1]
   
   results <- results %>% add_row(data.frame("method"  = "DSR TDW",
-                                            "est_beta" = coef(TDW)["Trt"],
-                                            "est_se" = sqrt(diag(vcov(TDW)))["Trt"],
-                                            "est_beta_CIl" = confint(TDW)["Trt",]["2.5 %"],
-                                            "est_beta_CIu" = confint(TDW)["Trt",]["97.5 %"],
+                                            "est_beta" = (fitci %>% filter(term == "Trt"))$estimate,
+                                            "est_se" = (fitci %>% filter(term == "Trt"))$std.error,
+                                            "est_beta_CIl" = (fitci %>% filter(term == "Trt"))$conf.low,
+                                            "est_beta_CIu" = (fitci %>% filter(term == "Trt"))$conf.high,
                                             "est_time" = t.tdw))
   
   return(results)
@@ -455,8 +465,6 @@ plot_distr_ps <- function(data, palette = "Set1")
 }
 
 plot_distr_pgs <- function(data, palette = "Set1") {
-  data <- estimate_pgs(data)
-  
   data <- data %>%
     spread(TrtGroup, "pgs", sep = "_p")
   
@@ -471,8 +479,6 @@ plot_distr_pgs <- function(data, palette = "Set1") {
     ggtitle("Distribution of the disease risk score") +
     scale_color_brewer(palette = palette) + 
     scale_fill_brewer(palette = palette)
-  
-  
 }
 
 plot_balance <- function(data, palette = "Set1") # show results for matching with replacement?

@@ -176,32 +176,11 @@ plot_balance(sim_NRS)
 The distribution of the disease risk score is as follows:
 
 ```{r, fig.height = 5, fig.width = 10}
-plot_distr_pgs(sim_NRS)
-
 # Estimate the prognostic score
-pgs <- glm(y ~ AGE + 
-               SEX + 
-               RACE + 
-               WEIGHTBL +
-               ONSYRS +
-               DIAGYRS + 
-               PRMSGR + 
-               RLPS1YR + # No. of Relapses 1 Yr Prior to Study
-               RLPS3YR +
-               GDLESBL  +
-               T1LESBL  +
-               T2LESBL +
-               NHPTMBL +
-               PASATABL +
-               T25FWABL +
-               EDSSBL + # Baseline EDSS
-               TRELMOS  +
-               SFPCSBL  +
-               SFMCSBL +
-               BVZBL  +
-               VFT25BL 
-             , data = sim_NRS[sim_NRS$Trt == 0,])
-sim_NRS$pgs <- predict(pgs, newdata = sim_NRS, type = "response")  
+sim_NRS <- estimate_pgs(sim_NRS)
+
+# Plot distribution of the prognostic score
+plot_distr_pgs(sim_NRS)
 ```
 
 # Estimation of the treatment effect
@@ -217,7 +196,7 @@ We consider the Expanded Disability Status Scale (EDSS) measured 36 weeks after 
 The disease risk score was calculated using linear regression in the control group, and includes the following baseline covariates as main effects:  `AGE`, `SEX`, `RACE`, `WEIGHTBL`, `ONSYRS`, `DIAGYRS`, `PRMSGR`, `RLPS1YR`, `RLPS3YR`, `GDLESBL`, `T1LESBL`, `T2LESBL`, `NHPTMBL`, `PASATABL`, `T25FWABL`, `EDSSBL`, `TRELMOS`, `SFPCSBL`, `SFMCSBL`, `BVZBL` and `VFT25BL`. 
 
 # Results
-The treatment effect estimates in this illustrative case study are as follows:
+The treatment effect estimates in this illustrative case study are given below. 
 
 ```{r}
 results <- analyze_nrs(sim_NRS)
