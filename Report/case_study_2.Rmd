@@ -69,10 +69,10 @@ The International Stroke Trial (IST) was a large, multi-center, randomized, plac
 
 We excluded patients with
 
-* Missing data for the primary outcome (N = `r length(which(dat_ASP$OCCODE == 9 | dat_ASP$OCCODE == 0))`)
-* No information on whether Aspirin was administered within 3 days prior to randomisation  (N = `r length(which(!(dat_ASP$RASP3 %in% c("Y", "N"))))`)
-* No information on whether Heparin was administered within 24 hours prior to randomisation (N = `r length(which(!(dat_ASP$RHEP24 %in% c("Y", "N"))))`)
-* No information on the presence of atrial fibrillation (N = `r length(which(!(dat_ASP$RATRIAL %in% c("Y", "N"))))`)
+* Missing data for the primary outcome (N = `r length(which(dat$OCCODE == 9 | dat$OCCODE == 0))`)
+* No information on whether Aspirin was administered within 3 days prior to randomisation  (N = `r length(which(!(dat$RASP3 %in% c("Y", "N"))))`)
+* No information on whether Heparin was administered within 24 hours prior to randomisation (N = `r length(which(!(dat$RHEP24 %in% c("Y", "N"))))`)
+* No information on the presence of atrial fibrillation (N = `r length(which(!(dat$RATRIAL %in% c("Y", "N"))))`)
 
 ```{r}
 dat_ASP$y <- dat_ASP$outcome
@@ -105,6 +105,15 @@ dat_ASP$RVISINF <- factor(dat_ASP$RVISINF,
 dat_ASP$STYPE <- factor(dat_ASP$STYPE, 
                     levels = c("PACS", "TACS", "POCS", "LACS", "OTH"), 
                     labels = c("PACS", "TACS", "POCS", "LACS", "Other"))
+dat_ASP$RDEF1 <- factor(dat_ASP$RDEF1, 
+                    levels = c("N", "Y", "C"), 
+                    labels = c("No", "Yes", "Can't  assess"))
+dat_ASP$RDEF2 <- factor(dat_ASP$RDEF2, 
+                    levels = c("N", "Y", "C"), 
+                    labels = c("No", "Yes", "Can't  assess"))
+dat_ASP$RDEF3 <- factor(dat_ASP$RDEF3, 
+                    levels = c("N", "Y", "C"), 
+                    labels = c("No", "Yes", "Can't  assess"))
 
 label(dat_ASP$AGE) <- "Age"
 label(dat_ASP$RSBP) <- "Systolic blood pressure at randomisation"
@@ -113,6 +122,9 @@ label(dat_ASP$RCONSC) <- "Conscious state at randomisation"
 label(dat_ASP$RCT) <- "CT before randomisation"
 label(dat_ASP$RVISINF) <- "Infarct visible on CT"
 label(dat_ASP$STYPE) <- "Stroke subtype"
+label(dat_ASP$RDEF1) <- "Face deficit"
+label(dat_ASP$RDEF2) <- "Arm/hand deficit"
+label(dat_ASP$RDEF3) <- "Leg/foot deficit"
 
 
 units(dat_ASP$AGE) <- "years"
@@ -120,22 +132,14 @@ units(dat_ASP$RSBP) <- "mmHg"
 
 
 table1(~ AGE + RSBP + SEX + RCONSC + RCT + RVISINF
-       + STYPE| albl, 
+       + STYPE + RDEF1 + RDEF2 + RDEF3 | albl, 
        data = dat_ASP, 
        caption = "Baseline characteristics of the patients that were administered Aspirin in the IST.")
 ```
 
+
+
 # Estimation of the treatment effect
-```{r}
-# We first estimate the prognostic score
-set <- 'rcs(AGE,3) + rcs(RSBP,3) + SEX + RCONSC + RCT + RVISINF + STYPE + 
-RDEF1 + RDEF2 + RDEF3 + RDEF4 + RDEF5 + RDEF6 + RDEF7 + RDEF8 + RATRIAL + RASP3'
-
-fmla.g <- formula(paste("y~", set))
-pgs <- glm(fmla.g, data = dat_ASP[dat_ASP$Trt == 0,], family = "binomial")
-dat_ASP$pgs <- predict(pgs, newdata = dat_ASP, "response")
-```
-
 We consider the Expanded Disability Status Scale (EDSS) measured 36 weeks after baseline as the primary outcome. Subsequently, we estimate the ATT in the simulated observation study using five approaches:
 
 * Naive: A linear regression ignoring the potential presence of confounding and effect modification.
@@ -144,28 +148,35 @@ We consider the Expanded Disability Status Scale (EDSS) measured 36 weeks after 
 * DSR IPW: inverse probability weighting using the disease risk score
 * DSR TDW: target distribution weighting using the disease risk score
 
-The disease risk score was calculated using linear regression in the control group, and includes the following baseline covariates as main effects: [TODO]
+The disease risk score was calculated using logistic regression in the control group, and includes the following baseline covariates as main effects:  `AGE`, `RSBP`, `SEX`, `RCONSC`, `RCT`, `RVISINF`, `STYPE`, `RDEF1`, `RDEF2`, `RDEF3`, `RDEF4`, `RDEF5`, `RDEF6`, `RDEF7`, `RDEF8`,  `RATRIAL`, and `RASP3`.
 
 The distribution of the disease risk score is as follows:
 
 ```{r, fig.height = 5, fig.width = 10}
+# We first estimate the prognostic score
+set <- 'rcs(AGE,3) + rcs(RSBP,3) + SEX + RCONSC + RCT + RVISINF + STYPE + 
+RDEF1 + RDEF2 + RDEF3 + RDEF4 + RDEF5 + RDEF6 + RDEF7 + RDEF8 + RATRIAL + RASP3'
+
+fmla.g <- formula(paste("y~", set))
+pgs <- glm(fmla.g, data = dat_ASP[dat_ASP$Trt == 0,], family = "binomial")
+dat_ASP$pgs <- predict(pgs, newdata = dat_ASP, "response")
+
 data <- dat_ASP %>%
     spread(Trt, "pgs", sep = "_p")
   
-  ggplot(data) + 
-    geom_histogram(aes(x = Trt_p1, fill = "Early Aspirin administration"), color = "red", alpha = 0.5) + 
-    geom_histogram(aes(x = Trt_p0, y = -..count.., fill = "Late Aspirin administration"), color = "blue", alpha = 0.5) + 
-    ylab("Number of patients") + 
-    xlab("Predicted risk of death or dependence at 6 months") +
-    xlim(0,1) + 
-    geom_hline(yintercept = 0, lwd = 0.5) +
-    scale_y_continuous(labels = abs) +
-    theme(legend.position = "bottom", legend.title = element_blank()) +
-    ggtitle("Distribution of the disease risk score") +
-    scale_color_brewer(palette = "Set1") + 
-    scale_fill_brewer(palette = "Set1")
+ggplot(data) + 
+  geom_histogram(aes(x = Trt_p1, fill = "Early Aspirin administration"), color = "red", alpha = 0.5) + 
+  geom_histogram(aes(x = Trt_p0, y = -..count.., fill = "Late Aspirin administration"), color = "blue", alpha = 0.5) + 
+  ylab("Number of patients") + 
+  xlab("Predicted risk of death or dependence at 6 months") +
+  xlim(0,1) + 
+  geom_hline(yintercept = 0, lwd = 0.5) +
+  scale_y_continuous(labels = abs) +
+  theme(legend.position = "bottom", legend.title = element_blank()) +
+  ggtitle("Distribution of the disease risk score") +
+  scale_color_brewer(palette = "Set1") + 
+  scale_fill_brewer(palette = "Set1")
 ```
-
 
 # Results
 
