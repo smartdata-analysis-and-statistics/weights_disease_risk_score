@@ -114,6 +114,27 @@ dat_ASP$RDEF2 <- factor(dat_ASP$RDEF2,
 dat_ASP$RDEF3 <- factor(dat_ASP$RDEF3, 
                     levels = c("N", "Y", "C"), 
                     labels = c("No", "Yes", "Can't  assess"))
+dat_ASP$RDEF4 <- factor(dat_ASP$RDEF4, 
+                    levels = c("N", "Y", "C"), 
+                    labels = c("No", "Yes", "Can't  assess"))
+dat_ASP$RDEF5 <- factor(dat_ASP$RDEF5, 
+                    levels = c("N", "Y", "C"), 
+                    labels = c("No", "Yes", "Can't  assess"))
+dat_ASP$RDEF6 <- factor(dat_ASP$RDEF6, 
+                    levels = c("N", "Y", "C"), 
+                    labels = c("No", "Yes", "Can't  assess"))
+dat_ASP$RDEF7 <- factor(dat_ASP$RDEF7, 
+                    levels = c("N", "Y", "C"), 
+                    labels = c("No", "Yes", "Can't  assess"))
+dat_ASP$RDEF8 <- factor(dat_ASP$RDEF8, 
+                    levels = c("N", "Y", "C"), 
+                    labels = c("No", "Yes", "Can't  assess"))
+dat_ASP$RATRIAL <- factor(dat_ASP$RATRIAL, 
+                    levels = c("N", "Y"), 
+                    labels = c("No", "Yes"))
+dat_ASP$RASP3 <- factor(dat_ASP$RASP3, 
+                    levels = c("N", "Y"), 
+                    labels = c("No", "Yes"))
 
 label(dat_ASP$AGE) <- "Age"
 label(dat_ASP$RSBP) <- "Systolic blood pressure at randomisation"
@@ -125,14 +146,22 @@ label(dat_ASP$STYPE) <- "Stroke subtype"
 label(dat_ASP$RDEF1) <- "Face deficit"
 label(dat_ASP$RDEF2) <- "Arm/hand deficit"
 label(dat_ASP$RDEF3) <- "Leg/foot deficit"
-
+label(dat_ASP$RDEF4) <- "Dysphasia"
+label(dat_ASP$RDEF5) <- "Hemianopia"
+label(dat_ASP$RDEF6) <- "Visuospatial disorder"
+label(dat_ASP$RDEF7) <- "Brainstem/cerebellar signs"
+label(dat_ASP$RDEF8) <- "Other deficit"
+label(dat_ASP$RATRIAL) <- "Atrial fibrillation"
+label(dat_ASP$RASP3) <- "Aspirin within 3 days prior to randomisation"
 
 units(dat_ASP$AGE) <- "years"
 units(dat_ASP$RSBP) <- "mmHg"
 
 
 table1(~ AGE + RSBP + SEX + RCONSC + RCT + RVISINF
-       + STYPE + RDEF1 + RDEF2 + RDEF3 | albl, 
+       + STYPE + RDEF1 + RDEF2 + RDEF3 + RDEF4 
+       + RDEF5 + RDEF6 + RDEF7 + RDEF8 + RATRIAL
+       + RASP3 | albl, 
        data = dat_ASP, 
        caption = "Baseline characteristics of the patients that were administered Aspirin in the IST.")
 ```
