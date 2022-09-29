@@ -1,4 +1,5 @@
 library(sas7bdat)
+library(broom)
 library(dplyr)
 library(mice)
 library(MatchIt)
@@ -289,13 +290,16 @@ estimate_pgs <- function(data) {
   return(data)
 }
 
-analyze_nrs <- function(data) {
+analyze_nrs <- function(data, seed = 1234) {
+  set.seed(seed)
+  
   results <- data.frame("method" = character(),
                         "est_beta" = numeric(),
                         "est_se" = numeric(),
                         "est_beta_CIl" = numeric(),
                         "est_beta_CIu" = numeric(),
-                        "est_time" = numeric())
+                        "est_time" = numeric(),
+                        "seed" = numeric())
   
   ##############################################################################
   # Naive treatment effect
@@ -386,27 +390,41 @@ analyze_nrs <- function(data) {
                                             "est_beta_CIu" = (fitci %>% filter(term == "Trt"))$conf.high,
                                             "est_time" = t.tdw))
   
+  results$seed <- seed
+  
   return(results)
 }
 
-analyze_nrs_bs <- function(data, iter = 1000, seed = 944, load = TRUE, dir = "../Data/", fn = "bootstrap.rda") {
-  B.RESULTS <- NULL
+analyze_nrs_bs <- function(data, iter = 1000, seed = 944, load = TRUE, dir = "../Data", fn = "bootstrap.rda") {
   
-  if (load & file.exists(paste0(dir, fn))) {
-    load(paste0(dir, fn))
+  B.RESULTS <- data.frame(iter = numeric(),
+                          method = character(),
+                          est_beta = numeric(),
+                          est_se = numeric(),
+                          est_beta_CIl = numeric(),
+                          est_beta_CIu = numeric(),
+                          est_time = numeric(),
+                          seed = numeric()
+                          )
+  
+  if (load & file.exists(file.path(dir, fn))) {
+    message("Loading saved results")
+    load(file.path(dir, fn))
     return(B.RESULTS)
   }
   
+  if (!file.exists(dir)) {
+    message("Creating new directory to save results")
+    dir.create(dir)
+  }
   
   pb <- txtProgressBar(min = 0, max = iter, initial = 0) 
   for (b in seq(iter))
   {
-    set.seed(seed + b)
-    
     data.b <- data[sample(rownames(data), nrow(data), replace = TRUE),]
-    b.results <- analyze_nrs(data.b)
+    b.results <- analyze_nrs(data.b, seed = seed + b)
     
-    B.RESULTS <- rbind(B.RESULTS, data.frame(iter = b, b.results))
+    B.RESULTS <- B.RESULTS %>% add_row(data.frame(iter = b, b.results))
     setTxtProgressBar(pb,b)
   }
   close(pb)
@@ -414,7 +432,7 @@ analyze_nrs_bs <- function(data, iter = 1000, seed = 944, load = TRUE, dir = "..
   B.RESULTS$method <- factor(B.RESULTS$method, labels = unique(B.RESULTS$method),
                              levels = unique(B.RESULTS$method))
   
-  save(B.RESULTS, file = paste0(dir, fn))
+  save(B.RESULTS, file = file.path(dir, fn))
   
   return(B.RESULTS)
 }
