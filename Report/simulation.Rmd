@@ -1,30 +1,45 @@
 ---
-title: "Simulation"
+title: "Simulation Study"
 author: "Thomas Debray"
 date: "This report was generated on `r format(Sys.time(), '%d %B, %Y')`"
 output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+# Set document properties
+knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+
+source("../R/functions.r")
+source("../R/sim.r")
+
+library(ggplot2)
+library(kableExtra)
 ```
 
-## R Markdown
+```{r}
+results <- runSim()
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+ggdat <- data.frame(est = c(results$naive, results$NNM, results$OFM, results$IPW, results$TDW),
+                    method = c(rep("Naive", nrow(results)), rep("NNM", nrow(results)), rep("OFM", nrow(results)),
+                               rep("IPW", nrow(results)), rep("TDW", nrow(results))),
+                    scenario = rep(results$scenario, 5),
+                    hte = rep(results$hte, 5))
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+ggdat$scenario <- factor(ggdat$scenario, 
+                         levels = c("A", "B", "C"), 
+                         labels = c("Weak confounding", "Moderate confounding", "Strong confounding"))
+ggdat$hte <- factor(ggdat$hte, 
+                    levels = c("no", "yes"), 
+                    labels = c("no effect modification", "effect modification"))
+                                        
 
-```{r cars}
-summary(cars)
+ggplot(ggdat, aes(x = method, y = est)) + 
+  geom_boxplot(aes(group = method)) +
+  facet_wrap(~scenario + hte) +
+  ylab("ATT")
 ```
 
-## Including Plots
 
-You can also embed plots, for example:
 
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
