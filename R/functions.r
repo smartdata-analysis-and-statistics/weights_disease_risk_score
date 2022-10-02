@@ -42,26 +42,19 @@ load_imputed_data <- function(fname, seed = 944) {
   } 
   
   dsout <- NULL
-  if (file.exists("F:/Projects/Datasets/Weights disease risk score/IDB_control.rda")) {
-    load("F:/Projects/Datasets/Weights disease risk score/IDB_control.rda")
-  } else {
-    rawdata <- sas7bdat::read.sas7bdat("F:/Projects/Datasets/Weights disease risk score/ades.sas7bdat") 
-    patinfo <- sas7bdat::read.sas7bdat("F:/Projects/Datasets/Weights disease risk score/adsl.sas7bdat")
-    
-    dsout <- subset(rawdata, STUDYID %in% c("C-1801","105MS301", "109MS301", "109MS302") & AVISITN >= 0)
-    dsout$TRIAL <- factor(dsout$STUDYID, levels = c("C-1801","105MS301", "109MS301", "109MS302"), 
-                          labels = c("AFFIRM", "ADVANCE",  "DEFINE", "CONFIRM"))
-    dsout <- left_join(dsout, patinfo, by = "USUBJID", keep = TRUE)
-    save(dsout, file = "F:/Projects/Datasets/Weights disease risk score/IDB_control.rda")
-  }
+
+  rawdata <- read.sas7bdat("ades.sas7bdat") 
+  patinfo <- read.sas7bdat("adsl.sas7bdat")
+  
+  dsout <- subset(rawdata, STUDYID %in% c("C-1801","105MS301", "109MS301", "109MS302") & AVISITN >= 0)
+  dsout$TRIAL <- factor(dsout$STUDYID, levels = c("C-1801","105MS301", "109MS301", "109MS302"), 
+                        labels = c("AFFIRM", "ADVANCE",  "DEFINE", "CONFIRM"))
+  dsout <- left_join(dsout, patinfo, by = "USUBJID", keep = TRUE)
   
   # Convert variables
   dsout <- dsout %>% transform(WhiteRace = ifelse(dsout$RACE == "WHITE", 1, 0),
                                MaleGender = ifelse(dsout$SEX == "M", 1, 0))
 
-  
-
-  
   set.seed(seed)
   
   # Start multiple imputation
@@ -120,7 +113,7 @@ prepare_nrs <- function(data, # List with data sets
   
   EDSS_END <-  subset(data, TRIAL %in% c(STUDYID_control, STUDYID_treat) & TRTA == "Placebo" & VISIT %in% END_VISIT)[,c("USUBJID.x", "AVAL")]
   
-  ds_full <- (left_join(ds, EDSS_END, "USUBJID.x"))
+  ds_full <- left_join(ds, EDSS_END, "USUBJID.x")
   ds_full <- na.omit(ds_full)
   
   ds_full$Trt <- NA
