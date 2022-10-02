@@ -15,107 +15,24 @@ source("../R/functions.r")
 
 library(table1)
 library(ggplot2)
-
-################################################################################
-# Prepare data
-################################################################################
-dat <- load_imputed_data("F:/OneDrive Smart Data/OneDrive - Smart Data Analysis and Statistics/Research/Manuscripts/Long - PGS weighting/data/IDB_control_imputed.rda")
-
-dat_baseline <- dat %>% 
-  group_by(USUBJID.x, TRIAL) %>% 
-  filter(AVISITN == 0 & TRTA == "Placebo") %>%
-  summarize(
-    AGE = first(AGE),
-    SEX = first(MaleGender),
-    RACE = first(WhiteRace),
-    WEIGHTBL = first(WEIGHTBL),
-    ONSYRS = first(ONSYRS),
-    DIAGYRS = first(DIAGYRS),
-    RLPS1YR = first(RLPS1YR),
-    RLPS3YR = first(RLPS3YR),
-    EDSSBL = first(EDSSBL),
-    GDLESBL = first(GDLESBL),
-    T1LESBL = first(T1LESBL),
-    T2LESBL = first(T2LESBL),
-    PRMSGR = first(PRMSGR),
-    NHPTMBL = first(NHPTMBL),
-    PASATABL = first(PASATABL),
-    T25FWABL = first(T25FWABL),
-    TRELMOS = first(TRELMOS),
-    SFMCSBL = first(SFMCSBL),
-    SFPCSBL = first(SFPCSBL),
-    BVZBL = first(BVZBL),
-    VFT25BL = first(VFT25BL)
-)
 ```
 
 # Original data sources
 Previously, four RCTs of relapsing-remitting multiple sclerosis (RRMS) were combined in an integrated clinical trial database. This database includes patient-level data from the following trials:
 
-* The ADVANCE trial includes `r  length(unique(subset(dat, TRIAL == "ADVANCE" & TRTA == "Placebo")$USUBJID.x))` patients who received placebo every 2 weeks for 48 weeks followed by 125 $\mu$g peginterferon beta-1a subcutaneously every 2 or 4 weeks for 48 weeks (https://www.clinicaltrials.gov/ct2/show/NCT00906399) 
-* The DEFINE trial includes `r length(unique(subset(dat, TRIAL == "DEFINE" & TRTA == "Placebo")$USUBJID.x))` patients who received two placebo capsules orally three times daily (https://www.clinicaltrials.gov/ct2/show/NCT00420212)
-* The CONFIRM trial includes `r length(unique(subset(dat, TRIAL == "CONFIRM" & TRTA == "Placebo")$USUBJID.x))` patients who received two placebo capsules orally three times daily (https://www.clinicaltrials.gov/ct2/show/NCT00451451) 
-* The AFFIRM trial includes  `r length(unique(subset(dat, TRIAL == "AFFIRM" & TRTA == "Placebo")$USUBJID.x))` patients who received placebo, intravenous infusion, every 4 weeks, for up to 116 weeks.  (https://www.clinicaltrials.gov/ct2/show/NCT00027300)
+* The ADVANCE trial includes 499 patients who received placebo every 2 weeks for 48 weeks followed by 125 $\mu$g peginterferon beta-1a subcutaneously every 2 or 4 weeks for 48 weeks (https://www.clinicaltrials.gov/ct2/show/NCT00906399) 
+* The DEFINE trial includes 408  patients who received two placebo capsules orally three times daily (https://www.clinicaltrials.gov/ct2/show/NCT00420212)
+* The CONFIRM trial includes 363  patients who received two placebo capsules orally three times daily (https://www.clinicaltrials.gov/ct2/show/NCT00451451) 
+* The AFFIRM trial includes  312  patients who received placebo, intravenous infusion, every 4 weeks, for up to 116 weeks.  (https://www.clinicaltrials.gov/ct2/show/NCT00027300)
 
-We here consider the following baseline covariates (some of which were imputed):
-
-```{r}
-dat_baseline$SEX <- factor(dat_baseline$SEX, levels = c(1,0), labels = c("Male", "Female"))
-dat_baseline$RACE <- factor(dat_baseline$RACE, levels = c(1,0), labels = c("White", "Non-white"))
-dat_baseline$PRMSGR <- factor(dat_baseline$PRMSGR, levels = c(1,0), labels = c("Yes", "No"))
-
-label(dat_baseline$AGE)       <- "Age"
-label(dat_baseline$SEX)       <- "Sex"
-label(dat_baseline$RACE)       <- "Ethnicity"
-label(dat_baseline$WEIGHTBL)       <- "Weight"
-label(dat_baseline$ONSYRS) <- "Time since first multiple sclerosis symptoms"
-label(dat_baseline$DIAGYRS) <- "Time since multiple sclerosis diagnosis"
-label(dat_baseline$EDSSBL) <- "Expanded Disability Status Scale"
-label(dat_baseline$PRMSGR) <- "Prior MS Treatment Group"
-label(dat_baseline$NHPTMBL) <- "9 Hole Peg Test Average Score"
-label(dat_baseline$SFMCSBL) <- "SF-36 mental component score"
-label(dat_baseline$SFPCSBL) <- "SF-36 physical component score"
-label(dat_baseline$PASATABL) <- "PASAT 3"
-label(dat_baseline$T25FWABL) <- "Timed 25 Foot Walk"
-label(dat_baseline$VFT25BL) <- "VFT 2.5%"
-label(dat_baseline$RLPS1YR) <- "No. of Relapses within the previous 12 months"
-label(dat_baseline$RLPS3YR) <- "No. of Relapses within the previous 3 years"
-label(dat_baseline$TRELMOS) <- "No. of months Since Recent Pre-Study Relapse"
-label(dat_baseline$BVZBL) <- "Brain Volume Z-Score"
-label(dat_baseline$GDLESBL) <- "Number of Gd+ lesions"
-label(dat_baseline$T1LESBL) <- "Number of T1 weighted lesions"
-label(dat_baseline$T2LESBL) <- "Number of T2 weighted lesions"
-
-units(dat_baseline$AGE)       <- "years"
-units(dat_baseline$WEIGHTBL) <- "kg"
-units(dat_baseline$ONSYRS)       <- "years"
-units(dat_baseline$DIAGYRS)       <- "years"
-
-
-table1(~ SEX + AGE + RACE + WEIGHTBL + ONSYRS + DIAGYRS + EDSSBL + 
-         NHPTMBL + SFMCSBL + SFPCSBL + PASATABL + T25FWABL + 
-         VFT25BL + RLPS1YR + RLPS3YR + TRELMOS + 
-         BVZBL + GDLESBL + T1LESBL + T2LESBL| TRIAL, 
-       data = dat_baseline, overall = NULL,
-       caption = "Baseline characteristics of the Placebo patients in the original trials.")
-```
-
-
-```{r, fig.height = 20, fig.width = 10}
-# Prepare NRS dataset
-dat_NRS <- prepare_nrs(dat, 
-                       STUDYID_control = c("ADVANCE"), 
-                       STUDYID_treat = c("AFFIRM", "DEFINE", "CONFIRM"))
-```
-To mimic an observational study, we consider the ADVANCE trial as 'control' placebo group and combine the remaining three trials (AFFIRM, DEFINE and CONFIRM) into an 'active' placebo group. The resulting dataset has a total of `r nrow(dat_NRS)` patients, with `r nrow(subset(dat_NRS, Trt == 0))` patients receiving control and `r nrow(subset(dat_NRS, Trt == 1))` patients receiving 'active' placebo.
-
+To mimic an observational study, we consider the ADVANCE trial as ‘control’ group and combine the data from the remaining three trials (AFFIRM, DEFINE and CONFIRM) into an ‘active’ treatment group. The resulting pooled dataset has a total of 1437 patients, with 465 patients receiving control and 972 patients receiving ‘active’ treatment.
 
 # Simulation of an observational study
 ```{r}
-sim_NRS <- simulate_nrs(dat_NRS)  #simulate_nrs(dat_NRS, load = FALSE, dir = "Data/")
+load("../Data/dat_cs1.rda")  
 ```
 
-We generated an artificial dataset with a predefined distribution of baseline EDSS for the control and active treatment group. To this purpose, we added 500 patients to the control group and 2000 patients to the active treatment group to the pooled placebo data and imputed their baseline and outcome data using multiple imputation. Subsequently, to mimic the presence of confounding, we omitted patients from the active comparator group according to the following baseline covariates: `T25FWABL` (Timed 25 Foot Walk), `SFPCSBL` (SF-36 physical component score), `SFMCSBL` (SF-36 mental component score), `GDLESBL` (Number of Gd+ lesions), `T1LESBL` (Number of T1 weighted lesions), `AGE` (age), `EDSSBL` (Expanded Disability Status Scale), `RLPS3YR` (No. of Relapses within the previous 3 years) and `SEX`. After imputation, the original trial data were omitted, resulting in a synthetic dataset of `r nrow(sim_NRS)` patients, with `r nrow(subset(sim_NRS, Trt == 0))` patients receiving control and `r nrow(subset(sim_NRS, Trt == 1))` patients receiving 'active' placebo. 
+We generated an artificial dataset with a predefined distribution of baseline EDSS for the control and active treatment group. To this purpose, we augmented the pooled placebo dataset with 500 control and 2000 treated patients. Subsequently, we imputed their baseline and outcome data using multiple imputation whilst imposing a null treatment effect.  After imputation we omitted patients from the active comparator group according to the following baseline covariates: `T25FWABL` (Timed 25 Foot Walk), `SFPCSBL` (SF-36 physical component score), `SFMCSBL` (SF-36 mental component score), `GDLESBL` (Number of Gd+ lesions), `T1LESBL` (Number of T1 weighted lesions), `AGE` (age), `EDSSBL` (Expanded Disability Status Scale), `RLPS3YR` (No. of Relapses within the previous 3 years) and `SEX`. After imputation, the original trial data were omitted, resulting in a synthetic dataset of `r nrow(sim_NRS)` patients, with `r nrow(subset(sim_NRS, Trt == 0))` patients receiving control and `r nrow(subset(sim_NRS, Trt == 1))` patients receiving 'active' placebo. 
 
 ```{r}
 sim_NRS$SEX <- factor(sim_NRS$SEX, levels = c(1,0), labels = c("Male", "Female"))
