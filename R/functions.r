@@ -27,12 +27,15 @@ tdw <- function(a, x, data, estimand = "ate",
   } else if (estimand == "atu") {
     data[data[,a] == 1, "w"] <- f0(data[data[,a] == 1, x])/f1(data[data[,a] == 1, x])
     data[data[,a] == 0, "w"] <- 1
+  } else {
+    stop("Estimand not supported!")
   }
   TDW <- data[,"w"]
   return(TDW)
 }
 
-load_imputed_data <- function(fname, seed = 944, 
+load_imputed_data <- function(fname, 
+                              seed = 944, 
                               adam.ades = "ades.sas7bdat", # Source data
                               adam.adsl = "adsl.sas7bdat" # Source data
                               ) {
@@ -40,7 +43,7 @@ load_imputed_data <- function(fname, seed = 944,
   
   if (file.exists(fname)) {
     message("Loading previously saved object ",fname)
-    load(fname)
+    load(fname) # Load dat_cc
     return(dat_cc)
   } 
   
@@ -132,8 +135,8 @@ simulate_nrs <- function(data, load = TRUE, seed = 944, dir = "../Data/") {
   set.seed(seed)
   
   dat_cc <- NULL
-  if (load & file.exists(paste(dir, "simdat.rda", sep = "" ))) {
-    load(paste(dir, "simdat.rda", sep = "" ))
+  if (load & file.exists(paste0(dir, "dat_cs1.rda"))) {
+    load(paste0(dir, "dat_cs1.rda"))
     return(dat_cc)
   }
   
@@ -179,28 +182,36 @@ simulate_nrs <- function(data, load = TRUE, seed = 944, dir = "../Data/") {
   imeth["SFMCSBL"] <- "rf"
   imeth["SFMCSBL"] <- "rf"
 
-  fit <- mice(data[,impvars], method = imeth, predictorMatrix = pM, m = 1, maxit = 10, printFlag = FALSE)
+  fit <- mice(data[,impvars], method = imeth, 
+              predictorMatrix = pM, m = 1, 
+              maxit = 10, printFlag = FALSE)
   
   # Keep only the artificial patients
   dat_cc <- subset(complete(fit, 1), imputed == 1)
   
   # Selectively remove patients from the control group
-  lp_include <- -log(dat_cc$T25FWABL + 1) - 0.09 * dat_cc$SFPCSBL - 0.05 * dat_cc$SFMCSBL - 0.7 * dat_cc$GDLESBL - 0.5 * log(dat_cc$T1LESBL + 1) - 0.05 * dat_cc$AGE - 0.8 * dat_cc$EDSSBL - 1 * dat_cc$RLPS3YR  - 1 * dat_cc$SEX
+  lp_include <- -log(dat_cc$T25FWABL + 1) - 
+    0.09 * dat_cc$SFPCSBL - 
+    0.05 * dat_cc$SFMCSBL - 
+    0.7 * dat_cc$GDLESBL - 
+    0.5 * log(dat_cc$T1LESBL + 1) - 
+    0.05 * dat_cc$AGE - 
+    0.8 * dat_cc$EDSSBL - 
+    1 * dat_cc$RLPS3YR  - 
+    1 * dat_cc$SEX
   
   p_include <- 1/(1 + exp(-(-mean(lp_include) + lp_include)))
 
   dat_cc$include <- rbinom(n = nrow(dat_cc), size = 1, prob = p_include)
   dat_cc$include[dat_cc$Trt == 0] <- 1 # Include all control patients
   
-  
   dat_cc <- subset(dat_cc, include == 1)
 
-  
   # Regenerate outcome y
   dat_cc <- dat_cc %>% dplyr::select(-imputed)
   dat_cc$TrtGroup <- ifelse(dat_cc$Trt == 0, "Control", "Active")
 
-  save(dat_cc, file = paste(dir, "simdat.rda", sep = "" ))
+  save(dat_cc, file = paste0(dir, "dat_cs1.rda"))
 
   return(dat_cc)
 }
