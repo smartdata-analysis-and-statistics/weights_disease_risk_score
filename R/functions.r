@@ -32,7 +32,10 @@ tdw <- function(a, x, data, estimand = "ate",
   return(TDW)
 }
 
-load_imputed_data <- function(fname, seed = 944) {
+load_imputed_data <- function(fname, seed = 944, 
+                              adam.ades = "ades.sas7bdat", # Source data
+                              adam.adsl = "adsl.sas7bdat" # Source data
+                              ) {
   dat_cc <- NULL
   
   if (file.exists(fname)) {
@@ -43,8 +46,8 @@ load_imputed_data <- function(fname, seed = 944) {
   
   dsout <- NULL
 
-  rawdata <- read.sas7bdat("ades.sas7bdat") 
-  patinfo <- read.sas7bdat("adsl.sas7bdat")
+  rawdata <- read.sas7bdat(adam.ades) 
+  patinfo <- read.sas7bdat(adam.adsl)
   
   dsout <- subset(rawdata, STUDYID %in% c("C-1801","105MS301", "109MS301", "109MS302") & AVISITN >= 0)
   dsout$TRIAL <- factor(dsout$STUDYID, levels = c("C-1801","105MS301", "109MS301", "109MS302"), 
