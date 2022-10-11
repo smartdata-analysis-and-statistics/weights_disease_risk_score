@@ -20,14 +20,15 @@ library(ggplot2)
 library(rms)
 ```
 
-
+# Data source
 ```{r}
 ################################################################################
 # Prepare data
 ################################################################################
 
 # Fetch IST v2.0 from the web
-d <- read.csv("https://datashare.ed.ac.uk/bitstream/handle/10283/124/IST%20dataset%20supp1%20%281%29%20trials%202011.csv?sequence=4&isAllowed=y")
+#d <- read.csv("https://datashare.ed.ac.uk/bitstream/handle/10283/124/IST%20dataset%20supp1%20%281%29%20trials%202011.csv?sequence=4&isAllowed=y")
+load("../Data/dat_cs2.rda")
 
 dat <- data.frame(HOSPNUM = d$HOSPNUM,
                   OCCODE = d$OCCODE,
